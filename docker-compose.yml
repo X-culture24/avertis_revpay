@@ -1,0 +1,145 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: etims_postgres
+    environment:
+      POSTGRES_DB: etims_db
+      POSTGRES_USER: etims_user
+      POSTGRES_PASSWORD: etims_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - etims_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U etims_user -d etims_db"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis for Celery
+  redis:
+    image: redis:7-alpine
+    container_name: etims_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - etims_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Django Web Application
+  web:
+    build: .
+    container_name: etims_web
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py collectstatic --noinput &&
+             gunicorn etims_integration.wsgi:application --bind 0.0.0.0:8000 --workers 3"
+    volumes:
+      - .:/app
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+      - logs_volume:/app/logs
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=False
+      - DATABASE_URL=postgresql://etims_user:etims_password@postgres:5432/etims_db
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - etims_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Celery Worker
+  celery_worker:
+    build: .
+    container_name: etims_celery_worker
+    command: celery -A etims_integration worker --loglevel=info --concurrency=2
+    volumes:
+      - .:/app
+      - logs_volume:/app/logs
+    environment:
+      - DEBUG=False
+      - DATABASE_URL=postgresql://etims_user:etims_password@postgres:5432/etims_db
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - etims_network
+
+  # Celery Beat (Scheduler)
+  celery_beat:
+    build: .
+    container_name: etims_celery_beat
+    command: celery -A etims_integration beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    volumes:
+      - .:/app
+      - logs_volume:/app/logs
+    environment:
+      - DEBUG=False
+      - DATABASE_URL=postgresql://etims_user:etims_password@postgres:5432/etims_db
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - etims_network
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: etims_nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+      - ./ssl:/etc/nginx/ssl
+    depends_on:
+      - web
+    networks:
+      - etims_network
+
+volumes:
+  postgres_data:
+  redis_data:
+  static_volume:
+  media_volume:
+  logs_volume:
+
+networks:
+  etims_network:
+    driver: bridge
