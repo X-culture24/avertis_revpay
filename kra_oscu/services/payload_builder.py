@@ -62,7 +62,7 @@ class PayloadBuilder:
         total_tax_amt = sum(float(item.tax_amount) for item in items)
         total_amt = float(invoice.total_amount)
 
-        # Build main payload
+        # Build main payload with proper KRA wrapper structure
         payload = {
             "trnsSalesSaveWrReq": {
                 "tin": device.tin,

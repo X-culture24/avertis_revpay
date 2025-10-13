@@ -103,7 +103,7 @@ class DeviceInitSerializer(serializers.Serializer):
         max_length=3,
         validators=[RegexValidator(r'^\d{3}$', 'Branch ID must be 3 digits')]
     )
-    serial_number = serializers.CharField(max_length=50)
+    device_serial = serializers.CharField(max_length=50, source='serial_number')
     device_name = serializers.CharField(max_length=100)
     pos_version = serializers.CharField(max_length=20, required=False, default="1.0")
     
@@ -261,9 +261,10 @@ class SalesRequestSerializer(serializers.Serializer):
         validators=[RegexValidator(r'^\d{11}$', 'Customer TIN must be 11 digits')]
     )
     customer_name = serializers.CharField(max_length=200, required=False, allow_blank=True)
-    payment_type = serializers.ChoiceField(
+    payment_method = serializers.ChoiceField(
         choices=Invoice.PAYMENT_TYPE_CHOICES,
-        default='CASH'
+        default='CASH',
+        source='payment_type'
     )
     transaction_date = serializers.DateTimeField()
     currency = serializers.CharField(max_length=3, default='KES')

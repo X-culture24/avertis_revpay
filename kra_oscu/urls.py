@@ -15,6 +15,7 @@ urlpatterns = [
     # Core eTIMS endpoints (legacy compatibility)
     path('device/init/', views.DeviceInitView.as_view(), name='device-init'),
     path('device/<uuid:device_id>/status/', views.DeviceStatusView.as_view(), name='device-status'),
+    path('device/<str:device_serial>/generate-keys/', views.GenerateDeviceKeysView.as_view(), name='generate-device-keys'),
     path('device/test-connection/', views.test_connection, name='test-connection'),
     path('sales/', views.SalesTransactionView.as_view(), name='sales-transaction'),
     path('invoices/', views.InvoiceListView.as_view(), name='invoice-list'),

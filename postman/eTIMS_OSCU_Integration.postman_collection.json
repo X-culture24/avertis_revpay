@@ -1,8 +1,8 @@
 {
 	"info": {
 		"_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-		"name": "eTIMS OSCU Integration API",
-		"description": "Complete API collection for testing KRA eTIMS OSCU integration endpoints.\n\nThis collection includes:\n- Device registration and management\n- Sales transaction processing\n- Item synchronization\n- System monitoring\n- Error handling scenarios\n\nBase URL: http://localhost:8000\nAuthentication: Token-based (obtain token via Django admin or create user endpoint)",
+		"name": "eTIMS OSCU Integration API - Updated",
+		"description": "Complete API collection for testing KRA eTIMS OSCU integration endpoints with real working data.\n\nThis collection includes:\n- Company onboarding workflow\n- Device registration with CMC key generation\n- Sales transaction processing with retry mechanism\n- API monitoring and logging\n- Complete end-to-end testing scenarios\n\nBase URL: http://localhost:8000\nAuthentication: Token adadec42f0aa4330b7df1392510ed347f0f72fd1\n\nWorking Test Data:\n- Company ID: 7c209984-2ead-41dd-866c-33bb1658a3cb\n- TIN: 98765432109\n- Device Serial: REAL009 (with CMC key)\n- Company: Test Company Ltd",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"item": [

@@ -1,0 +1,335 @@
+{
+	"info": {
+		"name": "Revpay Connect eTIMS Gateway - Complete API v2",
+		"description": "Comprehensive API collection for testing OSCU and VSCU integrations with sample data",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{auth_token}}",
+				"type": "string"
+			}
+		]
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8000"
+		},
+		{
+			"key": "company_id",
+			"value": "a91e2c7d-906e-44c7-b2b0-1dc9a4fc7bf6"
+		},
+		{
+			"key": "device_id",
+			"value": "0410142f-3b36-4dc3-9da1-f09762431eee"
+		}
+	],
+	"item": [
+		{
+			"name": "System Health",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/health/",
+					"host": ["{{base_url}}"],
+					"path": ["health", ""]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Test KRA Connection",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"url": {
+					"raw": "{{base_url}}/api/device/test-connection/",
+					"host": ["{{base_url}}"],
+					"path": ["api", "device", "test-connection", ""]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Company Onboarding",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"company_name\": \"Demo Store Ltd\",\n  \"tin\": \"30001234567\",\n  \"email\": \"demo@store.com\",\n  \"phone\": \"+254703000001\",\n  \"address\": \"700 Demo Street, Nairobi\",\n  \"business_type\": \"retail\",\n  \"contact_person\": \"Jane Demo\",\n  \"contact_email\": \"jane@store.com\",\n  \"contact_phone\": \"+254703000002\",\n  \"business_address\": \"700 Demo Street, Nairobi, Kenya\",\n  \"device_name\": \"Demo POS Terminal\",\n  \"bhf_id\": \"001\",\n  \"serial_number\": \"DEMO001\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/onboard/",
+					"host": ["{{base_url}}"],
+					"path": ["api", "onboard", ""]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "List Companies",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/companies/",
+					"host": ["{{base_url}}"],
+					"path": ["api", "companies", ""]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get Company Details",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/companies/{{company_id}}/",
+					"host": ["{{base_url}}"],
+					"path": ["api", "companies", "{{company_id}}", ""]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Register Device",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"device_serial\": \"NEW001\",\n  \"device_name\": \"New POS Terminal\",\n  \"device_type\": \"oscu\",\n  \"integration_type\": \"pos\",\n  \"bhf_id\": \"002\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/companies/{{company_id}}/devices/",
+					"host": ["{{base_url}}"],
+					"path": ["api", "companies", "{{company_id}}", "devices", ""]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Device Status",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/device/{{device_id}}/status/",
+					"host": ["{{base_url}}"],
+					"path": ["api", "device", "{{device_id}}", "status", ""]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Sales Transaction",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"company_id\": \"{{company_id}}\",\n  \"device_id\": \"{{device_id}}\",\n  \"items\": [\n    {\n      \"item_code\": \"ITEM001\",\n      \"item_name\": \"Premium Coffee Beans\",\n      \"quantity\": 2,\n      \"unit_price\": 1500.00,\n      \"tax_type\": \"A\"\n    },\n    {\n      \"item_code\": \"ITEM002\",\n      \"item_name\": \"Wireless Headphones\",\n      \"quantity\": 1,\n      \"unit_price\": 8500.00,\n      \"tax_type\": \"A\"\n    }\n  ],\n  \"payment_method\": \"cash\",\n  \"customer_tin\": \"12345678901\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/sales/",
+					"host": ["{{base_url}}"],
+					"path": ["api", "sales", ""]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "List Invoices",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/invoices/",
+					"host": ["{{base_url}}"],
+					"path": ["api", "invoices", ""]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Item Sync",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"items\": [\n    {\n      \"item_code\": \"NEW001\",\n      \"item_name\": \"New Product\",\n      \"item_type\": \"goods\",\n      \"unit_of_measure\": \"PCS\",\n      \"unit_price\": 2500.00,\n      \"tax_type\": \"A\",\n      \"category\": \"general\"\n    }\n  ]\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/item/sync/",
+					"host": ["{{base_url}}"],
+					"path": ["api", "item", "sync", ""]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "VSCU Integration Sales",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"company_id\": \"{{company_id}}\",\n  \"virtual_device_id\": \"VSCU_567_000\",\n  \"transaction_data\": {\n    \"items\": [\n      {\n        \"item_code\": \"SERV001\",\n        \"item_name\": \"IT Consulting Service\",\n        \"quantity\": 4,\n        \"unit_price\": 5000.00,\n        \"tax_type\": \"A\"\n      }\n    ],\n    \"payment_method\": \"card\",\n    \"customer_info\": {\n      \"name\": \"Virtual Customer\",\n      \"email\": \"customer@virtual.com\"\n    }\n  }\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/integration/sales/",
+					"host": ["{{base_url}}"],
+					"path": ["api", "integration", "sales", ""]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Company Analytics",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/analytics/{{company_id}}/",
+					"host": ["{{base_url}}"],
+					"path": ["api", "analytics", "{{company_id}}", ""]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "System Dashboard",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/dashboard/",
+					"host": ["{{base_url}}"],
+					"path": ["api", "dashboard", ""]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "API Logs",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/logs/",
+					"host": ["{{base_url}}"],
+					"path": ["api", "logs", ""]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Compliance Reports",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/compliance/{{company_id}}/reports/",
+					"host": ["{{base_url}}"],
+					"path": ["api", "compliance", "{{company_id}}", "reports", ""]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Environment Status",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/environment/{{company_id}}/status/",
+					"host": ["{{base_url}}"],
+					"path": ["api", "environment", "{{company_id}}", "status", ""]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Switch Environment",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"environment\": \"sandbox\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/environment/{{company_id}}/switch/",
+					"host": ["{{base_url}}"],
+					"path": ["api", "environment", "{{company_id}}", "switch", ""]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Test Connectivity",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"test_type\": \"full\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/environment/{{company_id}}/test-connectivity/",
+					"host": ["{{base_url}}"],
+					"path": ["api", "environment", "{{company_id}}", "test-connectivity", ""]
+				}
+			},
+			"response": []
+		}
+	]
+}

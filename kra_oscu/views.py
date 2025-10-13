@@ -13,7 +13,9 @@ from django.core.paginator import Paginator
 import logging
 import uuid
 
-from .models import Device, Invoice, InvoiceItem, ItemMaster, ApiLog, RetryQueue
+from .models import (
+    Device, Invoice, InvoiceItem, ItemMaster, ApiLog, RetryQueue, SystemCode, Company
+)
 from .serializers import (
     DeviceSerializer, DeviceInitSerializer, InvoiceSerializer, 
     SalesRequestSerializer, SalesResponseSerializer, ApiLogSerializer,
@@ -21,7 +23,9 @@ from .serializers import (
     ErrorResponseSerializer
 )
 from .services.kra_client import KRAClient, KRAClientError
+from .services.crypto_utils import KRACryptoManager
 from .tasks import retry_sales_invoice
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -61,12 +65,16 @@ class DeviceInitView(APIView):
                     'timestamp': timezone.now()
                 }, status=status.HTTP_409_CONFLICT)
 
+            # Get company from validated data
+            company = Company.objects.get(id=data['company_id'])
+            
             # Create or update device record
             device, created = Device.objects.get_or_create(
                 tin=data['tin'],
                 bhf_id=data['bhf_id'],
                 serial_number=data['serial_number'],
                 defaults={
+                    'company': company,
                     'device_name': data['device_name'],
                     'pos_version': data.get('pos_version', '1.0'),
                     'status': 'pending'
@@ -118,11 +126,19 @@ class DeviceInitView(APIView):
                 'timestamp': timezone.now()
             }, status=status.HTTP_502_BAD_GATEWAY)
         
+        except Company.DoesNotExist:
+            logger.error(f"Company not found: {data['company_id']}")
+            return Response({
+                'error': 'Company not found',
+                'message': 'The specified company does not exist or is not active',
+                'timestamp': timezone.now()
+            }, status=status.HTTP_404_NOT_FOUND)
+        
         except Exception as e:
             logger.error(f"Unexpected error during device init: {e}")
             return Response({
                 'error': 'Internal server error',
-                'message': 'An unexpected error occurred',
+                'message': f'An unexpected error occurred: {str(e)}',
                 'timestamp': timezone.now()
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -168,6 +184,7 @@ class SalesTransactionView(APIView):
                 # Create invoice
                 invoice = Invoice.objects.create(
                     device=device,
+                    company=device.company,
                     invoice_no=data['invoice_no'],
                     tin=data['tin'],
                     total_amount=total_amount,
@@ -175,7 +192,7 @@ class SalesTransactionView(APIView):
                     currency=data.get('currency', 'KES'),
                     customer_tin=data.get('customer_tin', ''),
                     customer_name=data.get('customer_name', ''),
-                    payment_type=data['payment_type'],
+                    payment_type=data.get('payment_method', 'CASH'),
                     transaction_date=data['transaction_date'],
                     status='pending'
                 )
@@ -518,3 +535,79 @@ def test_connection(request):
             'message': str(e),
             'timestamp': timezone.now()
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class GenerateDeviceKeysView(APIView):
+    """
+    Generate RSA key pair for device cryptographic signing.
+    POST /api/device/<device_serial>/generate-keys/
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, device_serial):
+        try:
+            # Get device by serial number
+            device = get_object_or_404(Device, serial_number=device_serial)
+            
+            # Generate RSA key pair directly without crypto manager to avoid Fernet issue
+            from cryptography.hazmat.primitives.asymmetric import rsa
+            from cryptography.hazmat.primitives import serialization
+            
+            # Generate RSA key pair
+            private_key = rsa.generate_private_key(
+                public_exponent=65537,
+                key_size=2048,
+            )
+            
+            # Serialize private key
+            private_key_pem = private_key.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.PKCS8,
+                encryption_algorithm=serialization.NoEncryption()
+            )
+            
+            # Serialize public key
+            public_key = private_key.public_key()
+            public_key_pem = public_key.public_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PublicFormat.SubjectPublicKeyInfo
+            )
+            
+            # Save keys to files
+            keys_dir = Path('keys')
+            keys_dir.mkdir(exist_ok=True)
+            
+            private_key_path = keys_dir / f"{device_serial}_private.pem"
+            public_key_path = keys_dir / f"{device_serial}_public.pem"
+            
+            private_key_path.write_bytes(private_key_pem)
+            public_key_path.write_bytes(public_key_pem)
+            
+            logger.info(f"Generated RSA keys for device {device_serial}")
+            
+            return Response({
+                'success': True,
+                'device_serial': device_serial,
+                'private_key_path': str(private_key_path),
+                'public_key_path': str(public_key_path),
+                'public_key_pem': public_key_pem.decode('utf-8'),
+                'message': f'RSA keys generated successfully for device {device_serial}',
+                'timestamp': timezone.now()
+            }, status=status.HTTP_201_CREATED)
+            
+        except Device.DoesNotExist:
+            return Response({
+                'success': False,
+                'error': 'Device not found',
+                'message': f'Device with serial number {device_serial} does not exist',
+                'timestamp': timezone.now()
+            }, status=status.HTTP_404_NOT_FOUND)
+            
+        except Exception as e:
+            logger.error(f"Error generating keys for device {device_serial}: {e}")
+            return Response({
+                'success': False,
+                'error': 'Key generation failed',
+                'message': str(e),
+                'timestamp': timezone.now()
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
