@@ -1,0 +1,20 @@
+{
+  "name": "avertis_revpay",
+  "version": "1.0.0",
+  "description": "**Certified 3rd-Party eTIMS Integrator for Kenya Revenue Authority**",
+  "main": "proxy-server.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "http-proxy-middleware": "^3.0.5"
+  }
+}

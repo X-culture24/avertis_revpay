@@ -1,0 +1,522 @@
+{
+	"info": {
+		"_postman_id": "revpay-mobile-api-2024",
+		"name": "Revpay Connect - Mobile API Collection",
+		"description": "Complete mobile API collection for React Native app integration with Django backend.\n\nThis collection includes:\n- JWT Authentication (login/refresh/logout)\n- Dashboard statistics and analytics\n- Invoice management and creation\n- Device management and synchronization\n- Company profile management\n- Compliance reporting\n- Health monitoring\n\nBase URL: https://056211fc8ef6.ngrok-free.app\nAuthentication: JWT Bearer Token",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "1. Authentication",
+			"item": [
+				{
+					"name": "Login (Get JWT Token)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    if (jsonData.tokens && jsonData.tokens.access) {",
+									"        pm.environment.set('jwt_access_token', jsonData.tokens.access);",
+									"        pm.environment.set('jwt_refresh_token', jsonData.tokens.refresh);",
+									"        pm.environment.set('user_id', jsonData.user.id);",
+									"        pm.environment.set('user_email', jsonData.user.email);",
+									"        console.log('JWT tokens saved successfully');",
+									"    }",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"username\": \"{{mobile_username}}\",\n    \"password\": \"{{mobile_password}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/mobile/auth/login/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "mobile", "auth", "login", ""]
+						}
+					}
+				},
+				{
+					"name": "Refresh JWT Token",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    pm.environment.set('jwt_access_token', jsonData.access);",
+									"    console.log('JWT access token refreshed');",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"refresh\": \"{{jwt_refresh_token}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/mobile/auth/refresh/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "mobile", "auth", "refresh", ""]
+						}
+					}
+				},
+				{
+					"name": "Logout",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{jwt_access_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"refresh_token\": \"{{jwt_refresh_token}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/mobile/auth/logout/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "mobile", "auth", "logout", ""]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "2. Dashboard & Analytics",
+			"item": [
+				{
+					"name": "Get Dashboard Statistics",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{jwt_access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/mobile/dashboard/stats/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "mobile", "dashboard", "stats", ""]
+						}
+					}
+				},
+				{
+					"name": "Get Company Profile",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{jwt_access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/mobile/company/profile/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "mobile", "company", "profile", ""]
+						}
+					}
+				},
+				{
+					"name": "Update Company Profile",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{jwt_access_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"company_name\": \"Updated Company Name\",\n    \"contact_phone\": \"+254700123456\",\n    \"address\": \"Updated Address, Nairobi\",\n    \"business_type\": \"retail\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/mobile/company/profile/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "mobile", "company", "profile", ""]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "3. Invoice Management",
+			"item": [
+				{
+					"name": "Get All Invoices",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{jwt_access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/mobile/invoices/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "mobile", "invoices", ""]
+						}
+					}
+				},
+				{
+					"name": "Create New Invoice",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    var jsonData = pm.response.json();",
+									"    pm.environment.set('invoice_id', jsonData.id);",
+									"    console.log('Invoice created with ID: ' + jsonData.id);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{jwt_access_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"customer_name\": \"John Doe\",\n    \"customer_pin\": \"A123456789P\",\n    \"customer_email\": \"john@example.com\",\n    \"sales_type\": \"normal\",\n    \"payment_type\": \"cash\",\n    \"items\": [\n        {\n            \"item_code\": \"ITEM001\",\n            \"item_name\": \"Test Product\",\n            \"quantity\": 2,\n            \"unit_price\": 1000.00,\n            \"tax_type\": \"A\",\n            \"discount_amount\": 0\n        },\n        {\n            \"item_code\": \"ITEM002\",\n            \"item_name\": \"Another Product\",\n            \"quantity\": 1,\n            \"unit_price\": 500.00,\n            \"tax_type\": \"A\",\n            \"discount_amount\": 50.00\n        }\n    ]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/mobile/invoices/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "mobile", "invoices", ""]
+						}
+					}
+				},
+				{
+					"name": "Get Invoice Details",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{jwt_access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/mobile/invoices/{{invoice_id}}/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "mobile", "invoices", "{{invoice_id}}", ""]
+						}
+					}
+				},
+				{
+					"name": "Resync Invoice",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{jwt_access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/mobile/invoices/{{invoice_id}}/resync/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "mobile", "invoices", "{{invoice_id}}", "resync", ""]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "4. Device Management",
+			"item": [
+				{
+					"name": "Get All Devices",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{jwt_access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/mobile/devices/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "mobile", "devices", ""]
+						}
+					}
+				},
+				{
+					"name": "Register New Device",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    var jsonData = pm.response.json();",
+									"    pm.environment.set('device_id', jsonData.id);",
+									"    console.log('Device registered with ID: ' + jsonData.id);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{jwt_access_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"device_type\": \"oscu\",\n    \"integration_type\": \"pos\",\n    \"device_name\": \"Main POS Terminal\",\n    \"serial_number\": \"POS-001-2024\",\n    \"bhf_id\": \"001\",\n    \"dvc_srl_no\": \"POS-001-2024\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/mobile/devices/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "mobile", "devices", ""]
+						}
+					}
+				},
+				{
+					"name": "Get Device Details",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{jwt_access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/mobile/devices/{{device_id}}/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "mobile", "devices", "{{device_id}}", ""]
+						}
+					}
+				},
+				{
+					"name": "Sync Device",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{jwt_access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/mobile/devices/{{device_id}}/sync/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "mobile", "devices", "{{device_id}}", "sync", ""]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "5. Reporting & Compliance",
+			"item": [
+				{
+					"name": "Get Compliance Reports",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{jwt_access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/mobile/reports/?report_type=daily&start_date=2024-01-01&end_date=2024-12-31",
+							"host": ["{{base_url}}"],
+							"path": ["api", "mobile", "reports", ""],
+							"query": [
+								{
+									"key": "report_type",
+									"value": "daily"
+								},
+								{
+									"key": "start_date",
+									"value": "2024-01-01"
+								},
+								{
+									"key": "end_date",
+									"value": "2024-12-31"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Generate Custom Report",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{jwt_access_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"report_type\": \"monthly\",\n    \"start_date\": \"2024-01-01\",\n    \"end_date\": \"2024-01-31\",\n    \"include_details\": true\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/mobile/reports/generate/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "mobile", "reports", "generate", ""]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "6. VSCU Integration",
+			"item": [
+				{
+					"name": "Trigger VSCU Sync",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{jwt_access_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"sync_type\": \"full\",\n    \"force_sync\": false\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/mobile/vscu/sync/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "mobile", "vscu", "sync", ""]
+						}
+					}
+				},
+				{
+					"name": "Get VSCU Status",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{jwt_access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/mobile/vscu/status/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "mobile", "vscu", "status", ""]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "7. System Health",
+			"item": [
+				{
+					"name": "API Root",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/mobile/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "mobile", ""]
+						}
+					}
+				},
+				{
+					"name": "Health Check",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{jwt_access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/mobile/health/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "mobile", "health", ""]
+						}
+					}
+				},
+				{
+					"name": "Server Root (JSON Response)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/",
+							"host": ["{{base_url}}"]
+						}
+					}
+				}
+			]
+		}
+	]
+}

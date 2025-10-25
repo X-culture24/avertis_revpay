@@ -1,8 +1,8 @@
 # Revpay Connect eTIMS Gateway
 
-**Certified 3rd-Party eTIMS Integrator for Kenya Revenue Authority**
+**Mobile-First eTIMS Integration Platform for Kenya Revenue Authority**
 
-A comprehensive multi-tenant Django backend solution that enables businesses to seamlessly integrate with Kenya Revenue Authority's eTIMS system through both **Online Sales Control Unit (OSCU)** and **Virtual Sales Control Unit (VSCU)** APIs. Built by **Revpay Connect Ltd**, this production-ready system provides complete tax compliance automation for diverse business systems across Kenya.
+A streamlined Django backend API that powers React Native mobile applications for seamless integration with Kenya Revenue Authority's eTIMS system. This mobile-focused solution provides complete tax compliance automation through clean REST APIs, JWT authentication, and real-time synchronization with KRA systems.
 
 ## 🏆 KRA Certification Status
 - ✅ **OSCU Certified Integrator** - Physical device integrations
@@ -12,134 +12,138 @@ A comprehensive multi-tenant Django backend solution that enables businesses to 
 
 ## 🚀 Core Features
 
-### 🏢 Multi-Tenant Architecture
-- **Company Management**: Complete client onboarding with automatic device registration
-- **Secure Isolation**: Each business operates in its own secure environment
-- **Subscription Plans**: Flexible pricing tiers for different business sizes
-- **Environment Switching**: Seamless sandbox-to-production migration
+### 📱 Mobile-First Architecture
+- **React Native Integration**: Purpose-built for mobile app development
+- **JWT Authentication**: Secure token-based authentication for mobile apps
+- **Real-time Sync**: Live dashboard data and invoice management
+- **Offline Support**: Queue-based processing for network interruptions
 
-### 🔐 Enterprise Security
-- **Data Encryption**: Military-grade encryption for sensitive CMC keys and credentials
-- **Audit Logging**: Complete compliance trail with severity levels and user tracking
-- **Token Authentication**: Secure API access with role-based permissions
-- **Environment Isolation**: Strict separation between sandbox and production data
+### 🔐 Modern Security
+- **JWT Bearer Tokens**: Industry-standard mobile authentication
+- **Data Encryption**: Secure storage of sensitive KRA credentials
+- **API Rate Limiting**: Protection against abuse and overuse
+- **CORS Configuration**: Secure cross-origin requests for mobile apps
 
-### 📊 Analytics & Monitoring
-- **Real-time Dashboards**: Company-specific and system-wide analytics
-- **Compliance Reports**: Automated daily, weekly, and monthly compliance reporting
-- **Performance Metrics**: Transaction success rates, device uptime, and response times
-- **Alert System**: Proactive notifications for failures, compliance issues, and system health
+### 📊 Live Dashboard & Analytics
+- **Real-time Statistics**: Invoice counts, revenue, success rates
+- **Device Management**: OSCU/VSCU device registration and monitoring
+- **Company Profiles**: Complete business information management
+- **Compliance Reporting**: Automated KRA compliance tracking
 
-### 🔄 Resilience & Recovery
-- **Intelligent Retry Logic**: Exponential backoff with multi-tenant failure notifications
-- **Offline Resilience**: Queue-based processing for network interruptions
-- **Device Monitoring**: Automatic offline detection and alert notifications
-- **Data Backup**: Automated cleanup and archival of historical data
+### 🔄 Robust Integration
+- **Dual Device Support**: Both OSCU (physical) and VSCU (virtual) devices
+- **Intelligent Retry Logic**: Automatic retry for failed KRA submissions
+- **Background Processing**: Celery-based async task processing
+- **Health Monitoring**: System status and connectivity checks
 
-### 🔗 Dual Integration Capabilities
+### 📱 React Native Mobile App
+- **Complete Mobile Solution**: Full-featured React Native app included
+- **Dashboard Screen**: Real-time business statistics and analytics
+- **Invoice Management**: Create, view, and manage invoices on mobile
+- **Device Control**: Register and sync OSCU/VSCU devices
+- **Profile Management**: Company settings and user preferences
+- **Reports & Compliance**: Generate and export compliance reports
+- **Settings Panel**: Integration mode switching and configuration
 
-#### 🖥️ OSCU Integration (Online Sales Control Unit)
-- **Physical Device Support**: Hardware-based POS integrations
-- **Real-time Processing**: Direct KRA communication through certified devices
-- **Receipt Management**: Physical receipt printing and validation
-- **Offline Capabilities**: Queue-based processing during network interruptions
-
-#### ☁️ VSCU Integration (Virtual Sales Control Unit)  
-- **API-Only Integration**: Cloud-based virtual device management
-- **E-commerce Support**: Perfect for online stores and digital platforms
-- **Mobile App Integration**: Seamless mobile application tax compliance
-- **Webhook Notifications**: Real-time event-driven communications
-- **Scalable Architecture**: Handle high-volume digital transactions
-
-### 📱 Notification System
-- **Multi-Channel Alerts**: Email, SMS, webhook, and system notifications
-- **Branded Communications**: Professional Revpay Connect email templates
-- **Smart Routing**: Context-aware notification delivery based on severity
-- **Notification History**: Complete audit trail of all communications
+### 🔗 KRA eTIMS Integration
+- **OSCU Support**: Physical device integration for POS systems
+- **VSCU Support**: Virtual device integration for mobile/web apps
+- **Automatic Sync**: Real-time synchronization with KRA systems
+- **Error Handling**: Intelligent retry logic for failed submissions
+- **Compliance Tracking**: Complete audit trail for tax compliance
 
 ## 📋 Prerequisites
 
+### Backend Requirements
 - Python 3.11+
+- Django 4.2+
 - PostgreSQL 12+
 - Redis 6+
-- Docker & Docker Compose (optional)
+- Celery for background tasks
+
+### Mobile App Requirements
+- React Native 0.72+
+- Node.js 18+
+- Android Studio / Xcode
+- Expo CLI (optional)
 
 ## 🛠️ Quick Setup
 
-### 1. Environment Setup
+### 1. Backend Setup
 
 ```bash
 # Clone and navigate to project
-cd etims_integration
+cd avertis_revpay
 
 # Create virtual environment
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
+python -m venv etims_env
+source etims_env/bin/activate  # Linux/Mac
 # or
-venv\Scripts\activate  # Windows
+etims_env\Scripts\activate  # Windows
 
 # Install dependencies
 pip install -r requirements.txt
 ```
 
-### 2. System Initialization
-
-Initialize the Revpay Connect system with management commands:
+### 2. Mobile App Setup
 
 ```bash
-# Initialize system (creates admin user, encryption keys, system codes)
-python manage.py revpay_init_system --admin-email admin@yourcompany.com
+# Navigate to React Native app
+cd RevpayConnectNative
 
-# Setup periodic tasks for monitoring and maintenance
-python manage.py setup_celery_beat
+# Install dependencies
+npm install
 
-# Run system health check
-python manage.py revpay_status_check --verbose
+# For iOS (Mac only)
+cd ios && pod install && cd ..
+
+# Start Metro bundler
+npm start
 ```
 
-### 3. Database Configuration
+### 3. Database Setup
 
-Update `.env` file with your configuration:
+```bash
+# Run migrations
+python manage.py makemigrations
+python manage.py migrate
+
+# Create superuser
+python manage.py createsuperuser
+
+# Create test data (optional)
+python create_mock_data.py
+```
+
+### 4. Environment Configuration
+
+Create `.env` file with your configuration:
 
 ```env
 # Database
 DATABASE_URL=postgresql://username:password@localhost:5432/revpay_etims_db
 REDIS_URL=redis://localhost:6379/0
 
+# Django Settings
+SECRET_KEY=your-django-secret-key
+DEBUG=True
+ALLOWED_HOSTS=localhost,127.0.0.1,10.0.2.2,your-ngrok-domain.ngrok-free.app
+
 # KRA Configuration
 KRA_SANDBOX_BASE_URL=https://etims-api-sbx.kra.go.ke
 KRA_PROD_BASE_URL=https://etims-api.kra.go.ke
 KRA_ENVIRONMENT=sandbox
 
-# Security (generated by revpay_init_system)
-ENCRYPTION_KEY=your-generated-encryption-key
-SECRET_KEY=your-django-secret-key
-
-# Email Configuration (for notifications)
-EMAIL_HOST=smtp.gmail.com
-EMAIL_PORT=587
-EMAIL_USE_TLS=True
-EMAIL_HOST_USER=notifications@revpayconnect.com
-EMAIL_HOST_PASSWORD=your-email-password
-
-# Revpay Connect Branding
-COMPANY_NAME=Revpay Connect Ltd
-SUPPORT_EMAIL=support@revpayconnect.com
-SYSTEM_URL=https://gateway.revpayconnect.com
-```
-
-### 4. Database Migration
-
-```bash
-python manage.py makemigrations
-python manage.py migrate
+# JWT Configuration
+JWT_ACCESS_TOKEN_LIFETIME=60  # minutes
+JWT_REFRESH_TOKEN_LIFETIME=1440  # minutes (24 hours)
 ```
 
 ### 5. Start Services
 
 ```bash
 # Start Django development server
-python manage.py runserver
+python manage.py runserver 0.0.0.0:8000
 
 # In separate terminals:
 # Start Celery worker for async tasks
@@ -147,6 +151,23 @@ celery -A etims_integration worker --loglevel=info
 
 # Start Celery beat scheduler for periodic tasks
 celery -A etims_integration beat --loglevel=info
+
+# Start ngrok tunnel for mobile app connectivity
+ngrok http 8000
+```
+
+### 6. Run Mobile App
+
+```bash
+# In RevpayConnectNative directory
+# For Android
+npm run android
+
+# For iOS (Mac only)
+npm run ios
+
+# Or start Metro bundler
+npm start
 ```
 
 ## 🐳 Docker Setup
@@ -162,69 +183,85 @@ docker-compose logs -f
 docker-compose down
 ```
 
-## 📡 API Endpoints
+## 📡 Mobile API Endpoints
 
-### 🏢 Client Onboarding
-- `POST /api/onboard/` - Register new client company with automatic device setup
-- `GET /api/companies/` - List all companies (admin)
-- `GET /api/companies/{id}/` - Get company details
-- `PUT /api/companies/{id}/status/` - Update company status
-- `POST /api/companies/{id}/devices/` - Register additional device
+All mobile API endpoints are prefixed with `/api/mobile/` and use JWT Bearer authentication.
 
-### 📊 Analytics & Monitoring
-- `GET /api/analytics/company/{id}/` - Company-specific analytics dashboard
-- `GET /api/analytics/system/` - System-wide analytics dashboard
-- `GET /api/logs/` - API logs with filtering and pagination
-- `GET /api/compliance/reports/` - List compliance reports
-- `POST /api/compliance/generate/` - Generate compliance report
-- `GET /api/notifications/` - Notification history
+### 🔐 Authentication
+- `POST /api/mobile/auth/login/` - JWT login (returns access & refresh tokens)
+- `POST /api/mobile/auth/refresh/` - Refresh JWT access token
+- `POST /api/mobile/auth/logout/` - Logout and invalidate tokens
+- `POST /api/mobile/auth/register/` - Register new user account
 
-### 🔗 OSCU & VSCU Integration APIs
-- `POST /api/integration/oscu/sales/` - Process OSCU (physical device) transaction
-- `POST /api/integration/vscu/sales/` - Process VSCU (virtual device) transaction
-- `GET /api/integration/transactions/{id}/status/` - Get transaction status
-- `POST /api/integration/items/sync/` - Sync item catalog
-- `GET /api/integration/companies/{id}/devices/` - Get company devices (OSCU & VSCU)
-- `GET /api/integration/companies/{id}/items/` - Get company items
-- `POST /api/integration/webhook/` - Webhook endpoint for external notifications
-- `GET /api/integration/capabilities/` - Get integrator capabilities and supported systems
+### 📊 Dashboard & Analytics
+- `GET /api/mobile/dashboard/stats/` - Real-time dashboard statistics
+- `GET /api/mobile/company/profile/` - Get company profile information
+- `PUT /api/mobile/company/profile/` - Update company profile
 
-### 🔄 Environment Management
-- `GET /api/environment/status/` - Get current environment status
-- `POST /api/environment/switch/` - Switch between sandbox/production
-- `GET /api/environment/kra-endpoints/` - Get KRA API endpoints
-- `POST /api/environment/test-connectivity/` - Test KRA connectivity
+### 📄 Invoice Management
+- `GET /api/mobile/invoices/` - List all company invoices
+- `POST /api/mobile/invoices/` - Create new invoice
+- `GET /api/mobile/invoices/{id}/` - Get specific invoice details
+- `POST /api/mobile/invoices/{id}/resync/` - Retry failed invoice submission
 
-### 🔐 Legacy eTIMS Core (Backward Compatibility)
-- `POST /api/device/init/` - Initialize device with KRA
-- `GET /api/device/{id}/status/` - Check device status
-- `POST /api/sales/` - Process sales transaction
-- `GET /api/invoices/` - List invoices with filtering
-- `POST /api/item/sync/` - Sync items with KRA
-- `GET /health/` - System health check
+### 🖥️ Device Management
+- `GET /api/mobile/devices/` - List all registered devices
+- `POST /api/mobile/devices/` - Register new OSCU/VSCU device
+- `GET /api/mobile/devices/{id}/` - Get device details and status
+- `POST /api/mobile/devices/{id}/sync/` - Trigger device synchronization
+
+### 📋 Reports & Compliance
+- `GET /api/mobile/reports/` - List compliance reports
+- `POST /api/mobile/reports/generate/` - Generate custom compliance report
+
+### 🔄 VSCU Integration
+- `POST /api/mobile/vscu/sync/` - Trigger VSCU synchronization
+- `GET /api/mobile/vscu/status/` - Get VSCU device status
+
+### 🏥 System Health
+- `GET /api/mobile/` - API root endpoint
+- `GET /api/mobile/health/` - System health check
 
 ## 🧪 Testing with Postman
 
-1. Import the Postman collection: `postman/eTIMS_OSCU_Integration.postman_collection.json`
-2. Import the environment: `postman/eTIMS_Environment.postman_environment.json`
-3. Update the `auth_token` variable with your Django auth token
-4. Run the collection to test all endpoints
+### Import Collections
+1. Import the mobile API collection: `postman/Revpay_Connect_Mobile_API.postman_collection.json`
+2. Import the environment: `postman/Mobile_API_Environment.postman_environment.json`
+3. Update the `base_url` to your ngrok tunnel URL
+4. Set `mobile_username` and `mobile_password` for testing
 
-### Getting Auth Token
+### Testing Workflow
+1. **Authentication**: Run "Login (Get JWT Token)" - automatically saves tokens
+2. **Dashboard**: Test "Get Dashboard Statistics" for live data
+3. **Invoices**: Create and manage invoices through API
+4. **Devices**: Register and sync OSCU/VSCU devices
+5. **Reports**: Generate compliance reports
 
+### Mobile App Testing
 ```bash
-# Create user and get token via Django shell
-python manage.py shell
+# Update API URL in mobile app
+# File: RevpayConnectNative/src/services/api.ts
+# Set baseURL to your ngrok tunnel URL
 
-from django.contrib.auth.models import User
-from rest_framework.authtoken.models import Token
-
-user = User.objects.create_user('testuser', 'test@example.com', 'password123')
-token = Token.objects.create(user=user)
-print(f"Token: {token.key}")
+# Test login credentials
+Username: demo@store.com
+Password: password123
 ```
 
 ## 🔧 Configuration
+
+### Mobile App Configuration
+
+Update the API base URL in your React Native app:
+
+```typescript
+// File: RevpayConnectNative/src/services/api.ts
+const API_BASE_URL = 'https://your-ngrok-domain.ngrok-free.app';
+
+// Or for local development
+const API_BASE_URL = 'http://10.0.2.2:8000';  // Android emulator
+const API_BASE_URL = 'http://localhost:8000';  // iOS simulator
+```
 
 ### KRA Environment Settings
 
@@ -240,84 +277,99 @@ KRA_ENVIRONMENT=production
 KRA_PROD_BASE_URL=https://etims-api.kra.go.ke
 ```
 
-### Celery Task Configuration
-
-Key async tasks:
-- `retry_sales_invoice` - Retry failed transactions
-- `sync_device_status` - Periodic device health checks
-- `cleanup_old_logs` - Database maintenance
-- `generate_daily_report` - Transaction reporting
-
 ## 📊 Monitoring
 
-### Health Check
+### Mobile API Health Check
 ```bash
-curl http://localhost:8000/health/
+# Test API connectivity
+curl https://your-ngrok-domain.ngrok-free.app/api/mobile/
+
+# Test authentication
+curl -X POST https://your-ngrok-domain.ngrok-free.app/api/mobile/auth/login/ \
+  -H "Content-Type: application/json" \
+  -d '{"username": "demo@store.com", "password": "password123"}'
 ```
 
-### API Logs
-Access Django admin at `http://localhost:8000/admin/` to view:
-- Device registrations
-- Transaction logs
-- API call history
-- Retry queue status
+### Django Admin
+Access Django admin at `https://your-ngrok-domain.ngrok-free.app/admin/` to view:
+- User accounts and companies
+- Invoice and device records
+- API logs and system health
+- Background task status
 
 ## 🔒 Security
 
-- Token-based authentication for all API endpoints
-- Request rate limiting via Nginx
-- SQL injection protection via Django ORM
-- CORS configuration for cross-origin requests
-- Audit logging for compliance
+- **JWT Authentication**: Secure Bearer token authentication for mobile apps
+- **CORS Configuration**: Properly configured for React Native requests
+- **SQL Injection Protection**: Django ORM with parameterized queries
+- **Rate Limiting**: API throttling to prevent abuse
+- **Data Encryption**: Sensitive KRA credentials encrypted at rest
+- **Audit Logging**: Complete API access and transaction logging
 
 ## 📈 Performance
 
-- Connection pooling for database efficiency
-- Redis caching for frequently accessed data
-- Async processing for non-blocking operations
-- Horizontal scaling support with load balancer
+- **Database Optimization**: Connection pooling and query optimization
+- **Redis Caching**: Fast access to frequently requested data
+- **Async Processing**: Celery workers for background KRA synchronization
+- **Mobile Optimization**: Lightweight JSON responses for mobile apps
+- **Real-time Updates**: Live dashboard data without polling
 
 ## 🚨 Error Handling
 
 The system implements comprehensive error handling:
 
-1. **Validation Errors**: Client-side data validation
-2. **Network Errors**: Automatic retry with exponential backoff
-3. **KRA Service Errors**: Graceful degradation and queuing
-4. **Database Errors**: Transaction rollback and recovery
+1. **Mobile App Errors**: Proper error messages and user feedback
+2. **Network Connectivity**: Offline support and retry mechanisms
+3. **JWT Token Expiry**: Automatic token refresh handling
+4. **KRA Service Errors**: Intelligent retry with exponential backoff
+5. **Validation Errors**: Clear error messages for form validation
 
-## 📋 KRA Integration Flow
+## 📋 Mobile App Integration Flow
 
-### Device Registration
-1. POST device details to `/api/device/init/`
-2. System calls KRA `/selectInitOsdcInfo`
-3. CMC key stored securely
-4. Device marked as active
+### User Authentication
+1. User logs in through mobile app
+2. App calls `/api/mobile/auth/login/` with credentials
+3. Backend returns JWT access and refresh tokens
+4. App stores tokens securely for API calls
 
-### Sales Transaction
-1. POST transaction to `/api/sales/`
-2. System builds KRA-compliant payload
-3. Calls KRA `/saveTrnsSalesOsdc`
-4. Stores receipt signature and internal data
-5. Returns signed receipt to POS
+### Dashboard Data Flow
+1. App requests dashboard stats from `/api/mobile/dashboard/stats/`
+2. Backend aggregates real-time data (invoices, revenue, devices)
+3. Returns JSON response with current statistics
+4. App displays live data in dashboard UI
 
-### Error Recovery
-1. Failed transactions enter retry queue
-2. Celery workers process retries with backoff
-3. Admin alerts for permanent failures
-4. Complete audit trail maintained
+### Invoice Creation Flow
+1. User creates invoice through mobile app
+2. App validates data and calls `/api/mobile/invoices/`
+3. Backend processes invoice and submits to KRA
+4. Returns invoice status and KRA response
+5. App updates UI with success/error status
+
+### Device Management Flow
+1. User registers device through `/api/mobile/devices/`
+2. Backend initializes device with KRA systems
+3. Device sync status tracked and reported
+4. App displays device status and sync history
 
 ## 🔄 Deployment
 
 ### Production Checklist
 
+#### Backend Deployment
 - [ ] Update `SECRET_KEY` in production
 - [ ] Set `DEBUG=False`
 - [ ] Configure proper database credentials
 - [ ] Set up SSL certificates
-- [ ] Configure monitoring and alerting
-- [ ] Set up backup procedures
-- [ ] Review security settings
+- [ ] Configure CORS for mobile app domains
+- [ ] Set up monitoring and alerting
+- [ ] Configure Celery workers for background tasks
+
+#### Mobile App Deployment
+- [ ] Update API base URL to production domain
+- [ ] Configure proper app signing certificates
+- [ ] Test on physical devices
+- [ ] Submit to app stores (Google Play, Apple App Store)
+- [ ] Set up crash reporting and analytics
 
 ### Environment Variables
 
@@ -325,66 +377,67 @@ Required for production:
 ```env
 SECRET_KEY=your-production-secret-key
 DEBUG=False
-ALLOWED_HOSTS=your-domain.com
+ALLOWED_HOSTS=your-domain.com,your-mobile-app-domain.com
 DATABASE_URL=postgresql://user:pass@host:port/db
 REDIS_URL=redis://host:port/db
+CORS_ALLOWED_ORIGINS=https://your-mobile-app-domain.com
 ```
 
 ## 🚀 Getting Started Guide
 
-### For New Clients - Choose Your Integration Path
+### For Mobile App Developers
 
-#### 🖥️ OSCU Integration (Physical Devices)
-**Best for**: Retail stores, restaurants, physical POS systems
-1. **System Setup**: Follow the Quick Setup guide above
-2. **Company Onboarding**: Use `POST /api/onboard/` with `device_type: "oscu"`
-3. **Physical Device Setup**: Install and configure your OSCU hardware
-4. **POS Integration**: Connect your POS system using OSCU API endpoints
-5. **Testing**: Complete sandbox testing with physical receipts
-6. **Go Live**: Switch to production environment
+#### 📱 React Native Integration
+**Perfect for**: Mobile-first businesses, retail apps, service providers
 
-#### ☁️ VSCU Integration (Virtual Devices)
-**Best for**: E-commerce, mobile apps, SaaS platforms, API integrations
-1. **System Setup**: Follow the Quick Setup guide above
-2. **Company Onboarding**: Use `POST /api/onboard/` with `device_type: "vscu"`
-3. **API Integration**: Implement VSCU API endpoints in your application
-4. **Webhook Setup**: Configure webhooks for real-time notifications (optional)
-5. **Testing**: Complete sandbox testing with virtual transactions
-6. **Go Live**: Switch to production environment
+1. **Backend Setup**: Follow the Quick Setup guide above
+2. **Mobile App Setup**: Clone and configure the React Native app
+3. **API Configuration**: Update base URL to your backend/ngrok tunnel
+4. **Authentication**: Implement JWT login flow in your app
+5. **Dashboard Integration**: Connect to real-time dashboard APIs
+6. **Invoice Management**: Integrate invoice creation and management
+7. **Device Control**: Add OSCU/VSCU device management features
+8. **Testing**: Complete end-to-end testing with Postman and mobile app
+9. **Deployment**: Deploy backend and publish mobile app
 
-#### 🔄 Hybrid Integration (Both OSCU & VSCU)
-**Best for**: Multi-channel businesses with both physical and online presence
-1. **Multi-Device Onboarding**: Register both OSCU and VSCU devices
-2. **Unified Dashboard**: Monitor all channels through single interface
-3. **Cross-Channel Reporting**: Consolidated compliance and analytics
-4. **Flexible Scaling**: Add more devices as business grows
+#### 🔧 Custom Integration
+**For existing mobile apps**: Integrate with your current React Native/Flutter app
 
-### For Developers
+1. **API Integration**: Use the mobile API endpoints in your existing app
+2. **Authentication**: Implement JWT Bearer token authentication
+3. **UI Components**: Adapt the provided UI components to your design
+4. **State Management**: Integrate with your existing state management solution
+5. **Testing**: Use Postman collection for API testing
 
-1. **API Documentation**: All endpoints include detailed request/response examples
-2. **Postman Collection**: Import and test all endpoints easily
-3. **Management Commands**: Use `revpay_status_check` for system monitoring
-4. **Analytics Dashboard**: Monitor your integration performance
-5. **Webhook Integration**: Receive real-time notifications
+### For Business Owners
+
+#### 📊 Complete Business Solution
+1. **Download Mobile App**: Get the React Native app from app stores
+2. **Account Setup**: Register your business and create user account
+3. **Device Registration**: Add your OSCU/VSCU devices through the app
+4. **Start Processing**: Begin creating and managing invoices
+5. **Monitor Compliance**: Track KRA submissions and compliance status
+6. **Generate Reports**: Export compliance reports for tax filing
 
 ## 🏗️ System Architecture
 
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   POS/ERP       │    │  Revpay Connect  │    │   KRA eTIMS     │
-│   Systems       │◄──►│     Gateway      │◄──►│     OSCU        │
+│  React Native   │    │   Django REST    │    │   KRA eTIMS     │
+│  Mobile App     │◄──►│      API         │◄──►│   OSCU/VSCU     │
+│  (JWT Auth)     │    │  (JWT + CORS)    │    │   Integration   │
 └─────────────────┘    └──────────────────┘    └─────────────────┘
                               │
                               ▼
                     ┌──────────────────┐
-                    │   Multi-Tenant   │
-                    │    Database      │
+                    │   PostgreSQL     │
+                    │   Database       │
                     └──────────────────┘
                               │
                               ▼
                     ┌──────────────────┐
-                    │ Analytics &      │
-                    │ Compliance       │
+                    │ Celery + Redis   │
+                    │ Background Tasks │
                     └──────────────────┘
 ```
 
@@ -392,92 +445,131 @@ REDIS_URL=redis://host:port/db
 
 ### System Administration
 ```bash
-# Initialize system with admin user and encryption
-python manage.py revpay_init_system --admin-email admin@yourcompany.com
+# Create superuser for Django admin
+python manage.py createsuperuser
 
-# Run comprehensive system health check
-python manage.py revpay_status_check --send-alerts --verbose
+# Create test data for development
+python create_mock_data.py
 
-# Setup periodic monitoring tasks
-python manage.py setup_celery_beat --clear-existing
+# Check database migrations
+python manage.py showmigrations
 ```
 
-### Monitoring & Maintenance
+### Mobile App Development
 ```bash
-# Check system status
-python manage.py revpay_status_check
+# Start Django development server for mobile app
+python manage.py runserver 0.0.0.0:8000
 
-# Generate compliance reports
-python manage.py shell -c "from kra_oscu.tasks import generate_compliance_reports; generate_compliance_reports.delay()"
+# Start ngrok tunnel for mobile testing
+ngrok http 8000
 
-# Clean old data
-python manage.py shell -c "from kra_oscu.tasks import cleanup_old_data; cleanup_old_data.delay()"
+# Test mobile API endpoints
+curl -X POST http://localhost:8000/api/mobile/auth/login/ \
+  -H "Content-Type: application/json" \
+  -d '{"username": "demo@store.com", "password": "password123"}'
 ```
 
-## 🔔 Notification Channels
+### Background Tasks
+```bash
+# Start Celery worker
+celery -A etims_integration worker --loglevel=info
 
-The system supports multiple notification channels:
+# Start Celery beat scheduler
+celery -A etims_integration beat --loglevel=info
 
-- **Email**: Professional branded templates for client communications
-- **Webhooks**: Real-time HTTP callbacks for external systems
-- **SMS**: Text message alerts for critical issues (via third-party providers)
-- **System Alerts**: In-dashboard notifications for administrators
+# Monitor Celery tasks
+celery -A etims_integration flower
+```
 
-## 📈 Compliance & Analytics
+## 📱 Mobile App Features
 
-### Automated Reports
-- **Daily Transaction Reports**: Automatic generation and delivery
-- **Compliance Summaries**: KRA submission status and error analysis
-- **Performance Metrics**: Response times, success rates, and system health
-- **Device Monitoring**: Uptime tracking and offline alerts
+The React Native mobile app includes:
 
-### Business Intelligence
-- **Revenue Analytics**: Transaction volume and value trends
-- **Tax Compliance**: VAT calculations and submission tracking
-- **Device Performance**: Individual device statistics and health
-- **Error Analysis**: Failure patterns and resolution tracking
+- **Dashboard**: Real-time business statistics and KRA compliance status
+- **Invoice Management**: Create, view, edit, and manage invoices
+- **Device Control**: Register and sync OSCU/VSCU devices
+- **Company Profile**: Manage business information and settings
+- **Reports**: Generate and export compliance reports
+- **Settings**: Configure integration modes and preferences
+- **Offline Support**: Queue operations when network is unavailable
 
-## 📞 Support & Contact
+## 📈 Mobile Analytics & Reporting
 
-### Revpay Connect Ltd
-- **Website**: [https://revpayconnect.com](https://revpayconnect.com)
-- **Email**: support@revpayconnect.com
-- **Technical Support**: tech@revpayconnect.com
-- **Sales Inquiries**: sales@revpayconnect.com
-- **Phone**: +254 700 000 000
+### Real-time Dashboard
+- **Live Statistics**: Current invoice counts, revenue, and success rates
+- **Device Status**: Real-time OSCU/VSCU device health and sync status
+- **Compliance Tracking**: KRA submission status and error monitoring
+- **Performance Metrics**: API response times and system health
 
-### Documentation & Resources
-- **API Documentation**: Available in Django admin and `/docs/` directory
-- **Integration Guides**: Step-by-step setup for popular POS systems
-- **Compliance Resources**: KRA eTIMS requirements and best practices
-- **Developer Portal**: [https://developers.revpayconnect.com](https://developers.revpayconnect.com)
+### Mobile Reports
+- **Compliance Reports**: Generate daily, weekly, monthly reports
+- **Export Functionality**: PDF and CSV export for tax filing
+- **Filter Options**: Date ranges, device types, transaction status
+- **Visual Analytics**: Charts and graphs for business insights
 
-### Emergency Support
-For critical production issues:
-- **24/7 Hotline**: +254 700 000 001
-- **Emergency Email**: emergency@revpayconnect.com
-- **Status Page**: [https://status.revpayconnect.com](https://status.revpayconnect.com)
+## 📞 Support & Documentation
 
-## 📄 License & Legal
+### Project Resources
+- **GitHub Repository**: Complete source code and documentation
+- **Postman Collection**: `postman/Revpay_Connect_Mobile_API.postman_collection.json`
+- **Mobile App**: `RevpayConnectNative/` - Complete React Native application
+- **API Documentation**: Django REST framework browsable API
 
-This software is proprietary to **Revpay Connect Ltd** and is licensed for use under our Terms of Service. 
+### Development Support
+- **Setup Guide**: Follow the Quick Setup section above
+- **API Testing**: Use Postman collection for endpoint testing
+- **Mobile Testing**: Test with Android/iOS emulators or physical devices
+- **Ngrok Integration**: Use ngrok tunnel for mobile app connectivity
 
-### Compliance Notice
-This system is certified for KRA eTIMS OSCU integration in Kenya. All implementations must:
-- Obtain proper KRA certification before production use
-- Comply with Kenya Revenue Authority tax regulations
-- Maintain audit trails as required by law
-- Ensure data security and privacy compliance
+### Technical Documentation
+- **API Endpoints**: Complete mobile API reference in this README
+- **Authentication**: JWT Bearer token implementation guide
+- **Database Models**: Django models for companies, devices, invoices
+- **Background Tasks**: Celery task configuration and monitoring
 
-### Data Protection
-Revpay Connect Gateway implements GDPR-compliant data handling:
-- Encryption of sensitive data at rest and in transit
-- Audit logging of all data access and modifications
-- Right to data portability and deletion
-- Regular security assessments and updates
+## 📄 Project Structure
+
+```
+avertis_revpay/
+├── etims_integration/          # Django project settings
+├── kra_oscu/                   # Main Django app
+│   ├── models.py              # Database models
+│   ├── api_views.py           # Mobile API views
+│   ├── api_urls.py            # Mobile API URLs
+│   └── services/              # KRA integration services
+├── RevpayConnectNative/        # React Native mobile app
+│   ├── src/
+│   │   ├── screens/           # App screens (Dashboard, Invoices, etc.)
+│   │   ├── services/          # API service layer
+│   │   ├── components/        # Reusable UI components
+│   │   └── navigation/        # App navigation
+│   └── package.json
+├── postman/                    # API testing collections
+│   ├── Revpay_Connect_Mobile_API.postman_collection.json
+│   └── Mobile_API_Environment.postman_environment.json
+├── requirements.txt            # Python dependencies
+├── manage.py                   # Django management script
+└── README.md                   # This file
+```
+
+## 📄 License & Compliance
+
+### KRA eTIMS Compliance
+This system integrates with Kenya Revenue Authority's eTIMS system:
+- Supports both OSCU (physical) and VSCU (virtual) devices
+- Implements proper KRA API protocols and security
+- Maintains audit trails as required by KRA regulations
+- Handles tax calculations and receipt generation
+
+### Development License
+This is a development project for KRA eTIMS integration. For production use:
+- Obtain proper KRA certification and approval
+- Ensure compliance with Kenya Revenue Authority regulations
+- Implement proper security measures for production deployment
+- Maintain data privacy and security standards
 
 ---
 
-**© 2024 Revpay Connect Ltd. All rights reserved.**
+**Mobile-First KRA eTIMS Integration Platform**
 
-*Empowering businesses across Kenya with seamless tax compliance automation.*
+*Streamlined tax compliance for modern mobile applications*

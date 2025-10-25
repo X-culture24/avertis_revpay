@@ -1,6 +1,6 @@
 """
 URL configuration for Revpay Connect eTIMS OSCU integration.
-Includes multi-tenant endpoints, onboarding, analytics, and integration APIs.
+Includes multi-tenant endpoints, onboarding, analytics, integration APIs, and web interface.
 """
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
@@ -9,9 +9,57 @@ from . import views_onboarding
 from . import views_analytics
 from . import views_integration
 from . import views_environment
+from . import api_views
+from . import mobile_api_views
+
+# Web interface URL patterns
+web_urlpatterns = [
+    # Authentication
+    path('', views.home_view, name='home'),
+    path('dashboard/', views.dashboard_view, name='dashboard'),
+    path('login/', views.login_view, name='login'),
+    path('register/', views.register_view, name='register'),
+    path('logout/', views.logout_view, name='logout'),
+    
+    # Main pages
+    path('invoices/', views.invoices_view, name='invoices'),
+    path('invoices/create/', views.create_invoice_view, name='create_invoice'),
+    path('invoices/<int:invoice_id>/', views.invoice_detail_view, name='invoice_detail'),
+    path('devices/', views.devices_view, name='devices'),
+    path('devices/sync/', views.sync_devices_view, name='sync_devices'),
+    path('devices/<uuid:device_id>/sync/', views.sync_devices_view, name='sync_single_device'),
+    path('reports/', views.reports_view, name='reports'),
+    path('settings/', views.settings_view, name='settings'),
+    
+    # Actions
+    path('invoices/<int:invoice_id>/resync/', views.resync_invoice_view, name='resync_invoice'),
+    path('vscu/sync/', views.trigger_vscu_sync_view, name='trigger_vscu_sync'),
+    path('invoices/retry-all/', views.retry_all_failed_view, name='retry_all_failed'),
+]
+
+# Mobile/Unified API URL patterns
+mobile_api_urlpatterns = [
+    # Authentication
+    path('auth/login/', mobile_api_views.mobile_login, name='mobile-login'),
+    
+    # Dashboard
+    path('dashboard/stats/', mobile_api_views.mobile_dashboard_stats, name='mobile-dashboard-stats'),
+    
+    # Invoices
+    path('invoices/', mobile_api_views.mobile_invoices_list, name='mobile-invoices-list'),
+    path('invoices/create/', mobile_api_views.mobile_create_invoice, name='mobile-create-invoice'),
+    path('invoices/<uuid:invoice_id>/', mobile_api_views.mobile_invoice_details, name='mobile-invoice-details'),
+    path('invoices/<uuid:invoice_id>/resync/', mobile_api_views.mobile_resync_invoice, name='mobile-resync-invoice'),
+    
+    # Receipt
+    path('receipts/<uuid:invoice_id>/', mobile_api_views.mobile_receipt_data, name='mobile-receipt-data'),
+    
+    # Notifications
+    path('notifications/', mobile_api_views.mobile_notifications, name='mobile-notifications'),
+]
 
 # API URL patterns
-urlpatterns = [
+api_urlpatterns = [
     # Core eTIMS endpoints (legacy compatibility)
     path('device/init/', views.DeviceInitView.as_view(), name='device-init'),
     path('device/<uuid:device_id>/status/', views.DeviceStatusView.as_view(), name='device-status'),
@@ -51,4 +99,10 @@ urlpatterns = [
     path('environment/<uuid:company_id>/switch/', views_environment.switch_environment, name='environment-switch'),
     path('environment/kra-endpoints/', views_environment.get_kra_endpoints, name='kra-endpoints'),
     path('environment/<uuid:company_id>/test-connectivity/', views_environment.test_kra_connectivity, name='test-connectivity'),
+]
+
+# Mobile-only URL patterns (web interface removed)
+urlpatterns = [
+    # Include the main API URLs from api_urls.py
+    path('', include('kra_oscu.api_urls')),
 ]

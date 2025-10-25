@@ -1,0 +1,111 @@
+{
+	"info": {
+		"name": "Mobile Auth Testing",
+		"description": "Test mobile authentication endpoints for Revpay Connect",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8000"
+		},
+		{
+			"key": "ngrok_url",
+			"value": "https://1e9ad7136c23.ngrok-free.app"
+		}
+	],
+	"item": [
+		{
+			"name": "Mobile Login",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"username\": \"demo@store.com\",\n  \"password\": \"password123\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/mobile/auth/login/",
+					"host": ["{{base_url}}"],
+					"path": ["api", "mobile", "auth", "login", ""]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Mobile Login (ngrok)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"username\": \"demo@store.com\",\n  \"password\": \"password123\"\n}"
+				},
+				"url": {
+					"raw": "{{ngrok_url}}/api/mobile/auth/login/",
+					"host": ["{{ngrok_url}}"],
+					"path": ["api", "mobile", "auth", "login", ""]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Mobile Register",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"company_name\": \"Test POS Store\",\n  \"tin\": \"30001234568\",\n  \"contact_person\": \"John Doe\",\n  \"contact_email\": \"john@testpos.com\",\n  \"contact_phone\": \"+254703000003\",\n  \"business_address\": \"123 Test Street, Nairobi, Kenya\",\n  \"business_type\": \"retail\",\n  \"password\": \"password123\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/mobile/auth/register/",
+					"host": ["{{base_url}}"],
+					"path": ["api", "mobile", "auth", "register", ""]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Test Mobile API Root",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/mobile/",
+					"host": ["{{base_url}}"],
+					"path": ["api", "mobile", ""]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Test Mobile API Root (ngrok)",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{ngrok_url}}/api/mobile/",
+					"host": ["{{ngrok_url}}"],
+					"path": ["api", "mobile", ""]
+				}
+			},
+			"response": []
+		}
+	]
+}

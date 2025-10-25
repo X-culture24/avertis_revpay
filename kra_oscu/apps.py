@@ -8,7 +8,4 @@ class KraOscuConfig(AppConfig):
 
     def ready(self):
         """Import signals when Django starts"""
-        try:
-            import kra_oscu.signals
-        except ImportError:
-            pass
+        pass  # No signals module yet
