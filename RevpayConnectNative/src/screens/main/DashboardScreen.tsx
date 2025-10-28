@@ -9,6 +9,7 @@ import {
   SafeAreaView,
   StatusBar,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { useRecoilState, useRecoilValue } from 'recoil';
 import { useNavigation } from '@react-navigation/native';
@@ -26,21 +27,52 @@ const DashboardScreen: React.FC = () => {
   const integrationSettings = useRecoilValue(integrationSettingsState);
   const [refreshing, setRefreshing] = useState(false);
   const [recentInvoices, setRecentInvoices] = useState<Invoice[]>([]);
+  const [devices, setDevices] = useState<any[]>([]);
+  const [retryQueueSize, setRetryQueueSize] = useState(0);
+  const [lastSync, setLastSync] = useState<string | null>(null);
 
   const fetchDashboardData = async () => {
     try {
+      console.log('🔄 Fetching comprehensive dashboard data...');
+      
+      // Fetch dashboard stats with enhanced data
       const response = await apiService.getDashboardStats();
       if (response.success && response.data) {
+        console.log('📊 Dashboard stats received:', response.data);
         setDashboardStats(response.data as DashboardStats);
+        
+        // Extract additional data from dashboard stats
+        const stats = response.data as any;
+        setLastSync(stats.last_sync);
       }
 
       // Fetch recent invoices
       const invoicesResponse = await apiService.getInvoices(1, 5);
       if (invoicesResponse.success && invoicesResponse.data && typeof invoicesResponse.data === 'object' && invoicesResponse.data !== null && 'results' in invoicesResponse.data) {
+        console.log('📄 Recent invoices received:', (invoicesResponse.data as any).results?.length || 0);
         setRecentInvoices((invoicesResponse.data as any).results || []);
       }
+      
+      // Fetch devices
+      const devicesResponse = await apiService.getDevices();
+      if (devicesResponse.success && devicesResponse.data) {
+        console.log('📱 Devices received:', devicesResponse.data);
+        setDevices(Array.isArray(devicesResponse.data) ? devicesResponse.data : []);
+      }
+      
+      // Fetch VSCU status for retry queue info
+      try {
+        const vscuResponse = await apiService.getVSCUStatus();
+        if (vscuResponse.success && vscuResponse.data) {
+          console.log('⚡ VSCU status received:', vscuResponse.data);
+          setRetryQueueSize((vscuResponse.data as any).retry_queue_size || 0);
+        }
+      } catch (vscuError) {
+        console.log('ℹ️ VSCU status not available (normal for OSCU-only setups)');
+      }
+      
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
+      console.error('❌ Error fetching dashboard data:', error);
     }
   };
 
@@ -55,11 +87,58 @@ const DashboardScreen: React.FC = () => {
   }, []);
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'SYNCED': return colors.primary;
-      case 'PENDING': return colors.textSecondary;
-      case 'FAILED': return colors.primary;
+    switch (status?.toLowerCase()) {
+      case 'confirmed':
+      case 'synced': 
+      case 'active': return '#34C759';
+      case 'pending': 
+      case 'sent': return '#FF9500';
+      case 'failed': 
+      case 'inactive': return '#FF3B30';
+      case 'retry': return '#007AFF';
       default: return colors.textSecondary;
+    }
+  };
+  
+  const getIntegrationModeDisplay = (mode: string) => {
+    switch (mode) {
+      case 'oscu': return 'Online Mode (OSCU)';
+      case 'vscu': return 'Virtual Mode (VSCU)';
+      case 'mixed': return 'Hybrid Mode';
+      default: return 'Not Configured';
+    }
+  };
+  
+  const handleDeviceRegistration = () => {
+    Alert.alert(
+      'Device Registration',
+      'Would you like to register a new device?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'OSCU Device', onPress: () => console.log('Navigate to OSCU device registration') },
+        { text: 'VSCU Device', onPress: () => console.log('Navigate to VSCU device registration') },
+      ]
+    );
+  };
+  
+  const handleSyncDevices = async () => {
+    try {
+      console.log('🔄 Triggering device sync...');
+      // Trigger sync for all devices
+      for (const device of devices) {
+        await apiService.syncDevice(device.id);
+      }
+      
+      // Trigger VSCU sync if available
+      if (dashboardStats?.integration_mode === 'vscu' || dashboardStats?.integration_mode === 'mixed') {
+        await apiService.triggerVSCUSync();
+      }
+      
+      Alert.alert('Success', 'Device sync initiated successfully');
+      await fetchDashboardData(); // Refresh data
+    } catch (error) {
+      console.error('❌ Error syncing devices:', error);
+      Alert.alert('Error', 'Failed to sync devices. Please try again.');
     }
   };
 
@@ -108,6 +187,111 @@ const DashboardScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
         </View>
+        
+        {/* System Status Cards */}
+        <View style={styles.statusContainer}>
+          <View style={styles.statusCard}>
+            <Text style={styles.statusLabel}>Integration Mode</Text>
+            <Text style={styles.statusValue}>
+              {getIntegrationModeDisplay(dashboardStats?.integration_mode || 'none')}
+            </Text>
+            <View style={[styles.statusIndicator, { backgroundColor: getStatusColor(dashboardStats?.integration_mode === 'none' ? 'inactive' : 'active') }]} />
+          </View>
+          
+          <View style={styles.statusCard}>
+            <Text style={styles.statusLabel}>Active Devices</Text>
+            <Text style={styles.statusValue}>
+              {dashboardStats?.active_devices || 0} / {devices.length}
+            </Text>
+            <TouchableOpacity onPress={handleDeviceRegistration} style={styles.addDeviceButton}>
+              <Text style={styles.addDeviceText}>+</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+        
+        <View style={styles.statusContainer}>
+          <View style={styles.statusCard}>
+            <Text style={styles.statusLabel}>Failed Invoices</Text>
+            <Text style={[styles.statusValue, { color: getStatusColor('failed') }]}>
+              {dashboardStats?.failed_invoices || 0}
+            </Text>
+            {retryQueueSize > 0 && (
+              <Text style={styles.statusSubtext}>{retryQueueSize} in retry queue</Text>
+            )}
+          </View>
+          
+          <View style={styles.statusCard}>
+            <Text style={styles.statusLabel}>Last Sync</Text>
+            <Text style={styles.statusValue}>
+              {lastSync ? new Date(lastSync).toLocaleTimeString() : 'Never'}
+            </Text>
+            <TouchableOpacity onPress={handleSyncDevices} style={styles.syncButton}>
+              <Text style={styles.syncButtonText}>Sync</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+        
+        {/* Quick Actions */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Quick Actions</Text>
+        </View>
+        
+        <View style={styles.quickActionsContainer}>
+          <TouchableOpacity 
+            style={styles.quickActionCard}
+            onPress={() => (navigation as any).navigate('CreateInvoice')}
+          >
+            <Text style={styles.quickActionTitle}>Create Invoice</Text>
+            <Text style={styles.quickActionSubtitle}>New transaction</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.quickActionCard}
+            onPress={() => (navigation as any).navigate('Invoices')}
+          >
+            <Text style={styles.quickActionTitle}>View Invoices</Text>
+            <Text style={styles.quickActionSubtitle}>All transactions</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.quickActionCard}
+            onPress={() => (navigation as any).navigate('Reports')}
+          >
+            <Text style={styles.quickActionTitle}>Reports</Text>
+            <Text style={styles.quickActionSubtitle}>Analytics</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.quickActionCard}
+            onPress={() => (navigation as any).navigate('Settings')}
+          >
+            <Text style={styles.quickActionTitle}>Settings</Text>
+            <Text style={styles.quickActionSubtitle}>Configuration</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Company Setup - Available to all users */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Company Setup</Text>
+        </View>
+        
+        <View style={styles.quickActionsContainer}>
+          <TouchableOpacity 
+            style={styles.quickActionCard}
+            onPress={() => (navigation as any).navigate('SettingsTab', { screen: 'CompanyRegistration' })}
+          >
+            <Text style={styles.quickActionTitle}>Register Company</Text>
+            <Text style={styles.quickActionSubtitle}>KRA eTIMS registration</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.quickActionCard}
+            onPress={() => (navigation as any).navigate('SettingsTab', { screen: 'DeviceSetup' })}
+          >
+            <Text style={styles.quickActionTitle}>Device Setup</Text>
+            <Text style={styles.quickActionSubtitle}>Configure OSCU/VSCU</Text>
+          </TouchableOpacity>
+        </View>
 
         {/* Recent Activity Header */}
         <View style={styles.sectionHeader}>
@@ -123,20 +307,28 @@ const DashboardScreen: React.FC = () => {
             recentInvoices.map((invoice, index) => (
               <TouchableOpacity key={invoice.id} style={styles.transactionItem}>
                 <View style={styles.transactionIcon}>
-                  <View style={[styles.iconCircle, { backgroundColor: invoice.status === 'SYNCED' ? '#34C759' : '#FF9500' }]}>
+                  <View style={[styles.iconCircle, { backgroundColor: getStatusColor(invoice.status) }]}>
                     <Text style={styles.iconText}>
-                      {invoice.customerName ? invoice.customerName.charAt(0).toUpperCase() : 'C'}
+                      {((invoice as any).customer_name || invoice.customerName || 'C').charAt(0).toUpperCase()}
                     </Text>
                   </View>
                 </View>
                 <View style={styles.transactionDetails}>
-                  <Text style={styles.transactionName}>{invoice.customerName || 'Unknown Customer'}</Text>
+                  <Text style={styles.transactionName}>{(invoice as any).customer_name || invoice.customerName || 'Unknown Customer'}</Text>
                   <Text style={styles.transactionDate}>
-                    {invoice.createdAt ? new Date(invoice.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'No date'}
+                    {(invoice as any).created_at ? new Date((invoice as any).created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 
+                     invoice.createdAt ? new Date(invoice.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'No date'}
                   </Text>
+                  <View style={[styles.statusBadge, { backgroundColor: getStatusColor(invoice.status) }]}>
+                    <Text style={styles.statusBadgeText}>{invoice.status?.toUpperCase() || 'UNKNOWN'}</Text>
+                  </View>
                 </View>
                 <View style={styles.transactionAmount}>
-                  <Text style={styles.amountText}>KES {invoice.totalAmount ? invoice.totalAmount.toLocaleString() : '0'}</Text>
+                  <Text style={styles.amountText}>KES {(invoice as any).total_amount ? Number((invoice as any).total_amount).toLocaleString() : 
+                    invoice.totalAmount ? invoice.totalAmount.toLocaleString() : '0'}</Text>
+                  {((invoice as any).receipt_no) && (
+                    <Text style={styles.receiptText}>#{(invoice as any).receipt_no}</Text>
+                  )}
                 </View>
               </TouchableOpacity>
             ))
@@ -302,6 +494,129 @@ const styles = StyleSheet.create({
   emptyStateText: {
     ...typography.body,
     color: colors.textSecondary,
+  },
+  // Quick Actions Styles
+  quickActionsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.lg,
+  },
+  quickActionCard: {
+    width: '48%',
+    backgroundColor: colors.card,
+    padding: spacing.lg,
+    borderRadius: 12,
+    marginBottom: spacing.md,
+    elevation: 2,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  quickActionTitle: {
+    ...typography.body,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: spacing.xs,
+  },
+  quickActionSubtitle: {
+    ...typography.caption,
+    color: colors.textSecondary,
+  },
+  adminActionCard: {
+    borderLeftWidth: 4,
+    borderLeftColor: colors.primary,
+  },
+  adminLoginCard: {
+    backgroundColor: colors.primary,
+    width: '100%',
+  },
+  // Status and Transaction Styles
+  statusContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  statusCard: {
+    width: '48%',
+    backgroundColor: colors.card,
+    padding: spacing.md,
+    borderRadius: 12,
+    position: 'relative',
+  },
+  statusLabel: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
+  },
+  statusValue: {
+    ...typography.body,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  statusSubtext: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
+  },
+  statusIndicator: {
+    position: 'absolute',
+    top: spacing.sm,
+    right: spacing.sm,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  addDeviceButton: {
+    position: 'absolute',
+    top: spacing.sm,
+    right: spacing.sm,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addDeviceText: {
+    color: colors.secondary,
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  syncButton: {
+    position: 'absolute',
+    bottom: spacing.sm,
+    right: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    backgroundColor: colors.accent,
+    borderRadius: 6,
+  },
+  syncButtonText: {
+    ...typography.caption,
+    color: colors.secondary,
+    fontWeight: '600',
+  },
+  statusBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs / 2,
+    borderRadius: 12,
+    marginTop: spacing.xs,
+    alignSelf: 'flex-start',
+  },
+  statusBadgeText: {
+    ...typography.caption,
+    color: colors.secondary,
+    fontWeight: '600',
+    fontSize: 10,
+  },
+  receiptText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: spacing.xs / 2,
   },
   // Legacy styles for compatibility
   quickAction: {

@@ -11,6 +11,8 @@ import ReceiptScreen from '@/screens/main/ReceiptScreen';
 import ReportsScreen from '@/screens/main/ReportsScreen';
 import SettingsScreen from '@/screens/main/SettingsScreen';
 import ProfileScreen from '@/screens/main/ProfileScreen';
+import CompanyRegistrationScreen from '@/screens/setup/CompanyRegistrationScreen';
+import DeviceSetupScreen from '@/screens/setup/DeviceSetupScreen';
 import { MainTabParamList, RootStackParamList } from '@/types';
 import { colors } from '@/theme/theme';
 
@@ -93,6 +95,22 @@ const SettingsStack = () => (
       component={ProfileScreen}
       options={{ 
         title: 'Profile',
+        headerBackTitleVisible: false,
+      }}
+    />
+    <Stack.Screen 
+      name="CompanyRegistration" 
+      component={CompanyRegistrationScreen}
+      options={{ 
+        title: 'Company Registration',
+        headerBackTitleVisible: false,
+      }}
+    />
+    <Stack.Screen 
+      name="DeviceSetup" 
+      component={DeviceSetupScreen}
+      options={{ 
+        title: 'Device Setup',
         headerBackTitleVisible: false,
       }}
     />

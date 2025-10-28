@@ -41,7 +41,7 @@ const LoginScreen: React.FC = () => {
     try {
       // Test connectivity first - try to find working URL
       console.log('Testing backend connectivity...');
-      console.log('Available URLs to test:', ['https://056211fc8ef6.ngrok-free.app']);
+      console.log('Available URLs to test:', ['https://ce332d1080ca.ngrok-free.app']);
       
       const workingURL = await apiService.findWorkingURL();
       console.log('🔍 Working URL result:', workingURL);
@@ -53,7 +53,7 @@ const LoginScreen: React.FC = () => {
         console.log('⚠️ No working URL found in test, but trying login anyway...');
         
         // Test each URL individually and show results
-        for (const url of ['https://056211fc8ef6.ngrok-free.app']) {
+        for (const url of ['https://ce332d1080ca.ngrok-free.app']) {
           try {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 3000);
@@ -75,14 +75,15 @@ const LoginScreen: React.FC = () => {
       console.log('✅ Found working backend URL:', workingURL);
 
       console.log('Backend is reachable, attempting login...');
-      const response = await apiService.login(email, password);
+      const response = await apiService.login({ email, password });
       console.log('Login attempt completed:', response);
       
       if (response.success) {
+        console.log('✅ Login successful, storing tokens and setting auth state');
         setAuth({
           isAuthenticated: true,
           user: response.data?.user || { email },
-          tokens: { access: response.data?.token || '', refresh: '' },
+          tokens: { access: response.data?.token || '', refresh: response.data?.refresh || '' },
           loading: false
         });
       } else {

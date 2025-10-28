@@ -3,15 +3,17 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ApiResponse, DashboardStats, Invoice, IntegrationSettings, ComplianceReport, User, AuthTokens } from '@/types';
 
 // Network configuration - use ngrok tunnel for external access
-const BASE_URL = __DEV__ ? 'https://056211fc8ef6.ngrok-free.app' : 'https://your-production-api.com';
+const BASE_URL = __DEV__ ? 'https://ce332d1080ca.ngrok-free.app' : 'https://your-production-api.com';
 
 // Single server configuration using ngrok tunnel
 const POSSIBLE_URLS = [
-  'https://056211fc8ef6.ngrok-free.app', // ngrok tunnel for external access
+  'https://ce332d1080ca.ngrok-free.app', // ngrok tunnel for external access
 ];
 
 class ApiService {
   private api: AxiosInstance;
+  private token: string | null = null;
+  private refreshToken: string | null = null;
 
   constructor() {
     this.api = axios.create({
@@ -31,9 +33,18 @@ class ApiService {
     // Request interceptor to add auth token
     this.api.interceptors.request.use(
       async (config) => {
-        const token = await AsyncStorage.getItem('auth_token');
+        // Try instance token first, then AsyncStorage
+        const instanceToken = this.token;
+        const storageToken = await AsyncStorage.getItem('auth_token');
+        const token = instanceToken || storageToken;
+        
+        console.log('🔍 Token check - Instance:', instanceToken ? 'YES' : 'NO', 'Storage:', storageToken ? 'YES' : 'NO');
+        
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
+          console.log('🔑 Adding auth token to request:', token.substring(0, 20) + '...');
+        } else {
+          console.log('⚠️ No auth token found in instance or storage');
         }
         return config;
       },
@@ -100,46 +111,68 @@ class ApiService {
     }
   }
 
-  // Auth methods
-  async login(email: string, password: string) {
-    console.log('Attempting login to:', `${this.api.defaults.baseURL}/auth/login/`);
-    console.log('Login data:', { username: email, password: '***' });
+  // Authentication
+  async login(credentials: { email: string; password: string }) {
+    // Backend expects 'username' field, not 'email'
+    const loginData = {
+      username: credentials.email,
+      password: credentials.password
+    };
+    const response = await this.request<any>('POST', '/auth/login/', loginData);
     
-    try {
-      const response: AxiosResponse = await this.api.post('/auth/login/', {
-        username: email,
-        password,
-      });
-
-      console.log('Raw login response:', response.data);
+    if (response.success && response.data) {
+      // Handle Django JWT response format: {tokens: {access, refresh}, user}
+      const { tokens, user } = response.data;
       
-      // Handle the Django JWT response format
-      if (response.data.tokens && response.data.tokens.access) {
-        await this.storeToken(response.data.tokens.access);
+      if (tokens && tokens.access && tokens.refresh) {
+        this.token = tokens.access;
+        this.refreshToken = tokens.refresh;
+        // Store token in AsyncStorage for request interceptor
+        await AsyncStorage.setItem('auth_token', tokens.access);
+        await AsyncStorage.setItem('refresh_token', tokens.refresh);
+        console.log('💾 Tokens stored in AsyncStorage successfully');
         
         return {
           success: true,
           data: {
-            token: response.data.tokens.access,
-            refresh: response.data.tokens.refresh,
-            user: response.data.user
+            token: tokens.access,
+            refresh: tokens.refresh,
+            user: user
           }
         };
-      } else {
+      }
+    }
+    
+    return response;
+  }
+
+  // Admin Authentication
+  async adminLogin(credentials: { email: string; password: string; admin_code?: string }) {
+    const response = await this.request<any>('POST', '/auth/admin-login/', credentials);
+    
+    if (response.success && response.data) {
+      const { tokens, user } = response.data;
+      
+      if (tokens && tokens.access && tokens.refresh && user.is_staff) {
+        this.token = tokens.access;
+        this.refreshToken = tokens.refresh;
         return {
-          success: false,
-          message: response.data.message || 'Login failed'
+          success: true,
+          data: {
+            token: tokens.access,
+            refresh: tokens.refresh,
+            user: user
+          }
         };
       }
-    } catch (error: any) {
-      console.error('Login API Error:', error);
-      console.error('Error response:', error.response?.data);
-      
-      return {
-        success: false,
-        message: error.response?.data?.message || error.message || 'Login failed'
-      };
     }
+    
+    return response;
+  }
+
+  // Check admin permissions
+  async checkAdminPermissions() {
+    return this.request<any>('GET', '/auth/admin-check/');
   }
 
   async register(userData: any) {
@@ -153,11 +186,11 @@ class ApiService {
 
   // Integration Settings
   async getIntegrationSettings() {
-    return this.request<IntegrationSettings>('GET', '/api/devices/');
+    return this.request<IntegrationSettings>('GET', '/devices/');
   }
 
   async updateIntegrationSettings(settings: Partial<IntegrationSettings>) {
-    return this.request('PUT', '/api/devices/', settings);
+    return this.request('PUT', '/devices/', settings);
   }
 
   async testConnection() {
@@ -277,8 +310,24 @@ class ApiService {
   }
 
   // User profile
-  async getUserProfile() {
-    return this.request('GET', '/profile/');
+  async getCompanyProfile(): Promise<ApiResponse<any>> {
+    return this.request('GET', '/company/profile/');
+  }
+
+  async getDevices(): Promise<ApiResponse<any>> {
+    return this.request('GET', '/devices/');
+  }
+
+  async syncDevice(deviceId: string): Promise<ApiResponse<any>> {
+    return this.request('POST', `/devices/${deviceId}/sync/`);
+  }
+
+  async getVSCUStatus(): Promise<ApiResponse<any>> {
+    return this.request('GET', '/vscu/status/');
+  }
+
+  async triggerVSCUSync(): Promise<ApiResponse<any>> {
+    return this.request('POST', '/vscu/sync/');
   }
 
   async updateUserProfile(profileData: any) {
@@ -297,20 +346,16 @@ class ApiService {
 
   // Device Management
   async registerDevice(deviceData: any) {
-    return this.request('POST', '/api/devices/', deviceData);
-  }
-
-  async getDevices() {
-    return this.request('GET', '/devices/');
+    return this.request('POST', '/devices/', deviceData);
   }
 
   // VSCU Integration
   async registerVSCUDevice(deviceData: any) {
-    return this.request('POST', '/api/vscu/devices/', deviceData);
+    return this.request('POST', '/vscu/devices/', deviceData);
   }
 
   async processVSCUTransaction(transactionData: any) {
-    return this.request('POST', '/api/vscu/transactions/', transactionData);
+    return this.request('POST', '/vscu/transactions/', transactionData);
   }
 
   // System Management
@@ -319,18 +364,101 @@ class ApiService {
     if (companyId) params.append('company_id', companyId);
     params.append('limit', limit.toString());
     
-    return this.request('GET', `/api/logs/?${params.toString()}`);
+    return this.request('GET', `/logs/?${params.toString()}`);
   }
 
   async getEnvironmentStatus() {
-    return this.request('GET', '/api/environment/status/');
+    return this.request('GET', '/environment/status/');
   }
 
-  async switchEnvironment(environment: 'sandbox' | 'production', companyId: string) {
-    return this.request('POST', '/api/environment/switch/', {
-      environment,
-      company_id: companyId
-    });
+  async switchEnvironment(environment: 'sandbox' | 'production') {
+    return this.request('POST', '/environment/switch/', { environment });
+  }
+
+  // Company Registration & Device Setup (using existing endpoints)
+  async registerCompany(companyData: any) {
+    // Use existing register endpoint for company registration
+    return this.request('POST', '/auth/register/', companyData);
+  }
+
+  async setupDevice(deviceData: any) {
+    // Use existing devices endpoint for device setup
+    return this.request('POST', '/devices/', deviceData);
+  }
+
+  async getCompanies() {
+    return this.request('GET', '/companies/');
+  }
+
+  async getCompanyDetails(companyId: string) {
+    return this.request('GET', `/companies/${companyId}/`);
+  }
+
+  async updateCompanyStatus(companyId: string, status: string) {
+    return this.request('PUT', `/companies/${companyId}/status/`, { status });
+  }
+
+  async registerAdditionalDevice(companyId: string, deviceData: any) {
+    return this.request('POST', `/companies/${companyId}/devices/`, deviceData);
+  }
+
+  // Device Initialization & Certification
+  async initializeDevice(deviceData: any) {
+    return this.request('POST', '/devices/initialize/', deviceData);
+  }
+
+  async certifyDevice(deviceId: string) {
+    return this.request('POST', `/devices/${deviceId}/certify/`);
+  }
+
+  async getDeviceCertificationStatus(deviceId: string) {
+    return this.request('GET', `/devices/${deviceId}/certification/`);
+  }
+
+  async regenerateDeviceKeys(deviceId: string) {
+    return this.request('POST', `/devices/${deviceId}/regenerate-keys/`);
+  }
+
+  // System Administration
+  async getSystemAnalytics(companyId?: string) {
+    const endpoint = companyId ? `/analytics/${companyId}/` : '/analytics/';
+    return this.request('GET', endpoint);
+  }
+
+  async getSystemCodes() {
+    // Use existing items endpoint for system codes
+    return this.request('GET', '/items/');
+  }
+
+  async syncSystemCodes() {
+    // Use existing VSCU sync for system codes sync
+    return this.request('POST', '/vscu/sync/');
+  }
+
+  async syncItems() {
+    // Use existing VSCU sync for items sync
+    return this.request('POST', '/vscu/sync/');
+  }
+
+  async getSyncHistory() {
+    // Use existing reports endpoint for sync history
+    return this.request('GET', '/reports/');
+  }
+
+  async getSystemHealth() {
+    return this.request('GET', '/health/');
+  }
+
+  async getApiLogs(filters?: any) {
+    return this.request('GET', '/logs/', filters);
+  }
+
+  async processRetryQueue() {
+    return this.request('POST', '/retry-queue/process/');
+  }
+
+  async getRetryQueue() {
+    return this.request('GET', '/system/retry-queue/');
   }
 }
 

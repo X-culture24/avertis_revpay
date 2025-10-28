@@ -109,6 +109,8 @@ export type RootStackParamList = {
   SettingsMain: undefined;
   Reports: undefined;
   Profile: undefined;
+  CompanyRegistration: undefined;
+  DeviceSetup: undefined;
 };
 
 export type MainStackParamList = {
