@@ -1,6 +1,9 @@
 # KRA eTIMS OSCU Integration System
 ## A Complete Tax Management Solution for Kenyan Businesses
 
+**Last Updated:** November 9, 2025  
+**Compliance Status:** Phase 1 Complete (75% KRA Compliant)
+
 ---
 
 ## What is KRA eTIMS?
@@ -15,23 +18,28 @@
 
 - **Legal Requirement**: All businesses in Kenya must use eTIMS for tax compliance
 - **Real-time Reporting**: Sales are automatically reported to KRA
-- **Digital Receipts**: Customers get proper tax invoices
+- **Digital Receipts**: Customers get proper tax invoices with QR codes
 - **Audit Trail**: Complete record of all transactions
 - **Tax Calculation**: Automatic VAT and other tax calculations
+- **24-Hour Offline Rule**: KRA compliance for offline operations
 
 ---
 
 ## Our System Overview
 
-We've built a complete backend system that acts as a bridge between your business software (like a Point of Sale system) and KRA's eTIMS servers.
+We've built a complete backend system that acts as a bridge between your business software (like a Point of Sale system) and KRA's eTIMS servers, with full mobile app support.
 
 ### What Our System Does:
-1. **Registers your business devices** with KRA
+1. **Registers your business devices** with KRA (OSCU/VSCU)
 2. **Processes sales transactions** and sends them to KRA
-3. **Handles errors and retries** when KRA servers are busy
-4. **Keeps detailed logs** of all activities
-5. **Manages product catalogs** with proper tax codes
-6. **Provides monitoring dashboards** to track system health
+3. **Generates QR codes** on all receipts per KRA specification
+4. **Enforces 24-hour offline rule** - prevents invoice generation if offline >24h
+5. **Sequential receipt numbering** - automatic, unique invoice numbers
+6. **Handles errors and retries** with exponential backoff
+7. **Keeps detailed logs** of all activities
+8. **Manages product catalogs** with proper tax codes
+9. **Provides mobile app** for on-the-go invoice management
+10. **Monitors compliance** with KRA business rules
 
 ---
 
@@ -256,11 +264,83 @@ We provide a complete Postman collection with:
 6. **Import Postman collection** for testing
 
 ### For Business Users
-1. **Contact our team** for deployment assistance
-2. **Provide business details** (TIN, company info)
-3. **Setup testing environment** first
-4. **Train your staff** on the new system
-5. **Go live** with full support
+1. **Register via mobile app** - Simple registration form
+2. **Automatic setup** - Device initialized automatically
+3. **Start creating invoices** - Ready to use immediately
+4. **No manual configuration** - System handles KRA integration
+5. **Admin manages devices** - Via Django admin panel if needed
+
+**New Streamlined Onboarding:**
+- User registers with company details
+- System auto-creates company record
+- Default VSCU device created automatically
+- Device initialized with KRA in background
+- User can start creating invoices immediately
+- No manual device registration required
+
+---
+
+## KRA Compliance Implementation Status
+
+### ✅ Phase 1: Critical Compliance (COMPLETED)
+
+**Backend Features:**
+1. ✅ **QR Code Generation** - Automatic QR codes on all invoices per KRA format
+2. ✅ **Receipt Type Field** - Normal/Copy/Proforma/Training classification
+3. ✅ **Transaction Type Field** - Sale/Refund distinction
+4. ✅ **24-Hour Offline Rule** - Prevents invoice creation if device offline >24h
+5. ✅ **Sequential Receipt Numbers** - Thread-safe, auto-generated invoice numbers
+6. ✅ **Copy Receipt Validation** - Enforces original receipt reference
+7. ✅ **Device Certification Check** - Validates device status before invoice creation
+8. ✅ **Compliance Service** - Centralized business rule enforcement
+
+**Database:**
+- ✅ Migration completed with 5 new compliance fields
+- ✅ QR code storage (base64)
+- ✅ Receipt type tracking
+- ✅ Copy receipt handling
+
+**API Updates:**
+- ✅ Invoice serializer updated with new fields
+- ✅ Validation logic integrated
+- ✅ Compliance checks on invoice creation
+
+### ⚠️ Phase 2: Pending Implementation
+
+**High Priority:**
+1. ❌ PDF Receipt Template - KRA-compliant receipt generation
+2. ❌ "THIS IS NOT AN OFFICIAL RECEIPT" watermark for copies
+3. ❌ Z-Report generation - Daily sales aggregation
+4. ❌ X-Report generation - Shift sales aggregation
+
+**Medium Priority:**
+5. ❌ CodeSearch API - Tax types, units, countries sync
+6. ❌ Item Management APIs - ItemSave, ItemSearch
+7. ❌ Purchase Management APIs - For purchase tracking
+
+**Mobile App Updates (In Progress):**
+- ⚠️ CreateInvoiceScreen - Remove manual invoice number input
+- ⚠️ InvoiceDetailsScreen - Display QR codes
+- ⚠️ Receipt type selection UI
+- ⚠️ Offline status indicator
+
+### 📊 Compliance Score: 75%
+
+**What Works:**
+- Device registration with KRA (OSCU/VSCU)
+- Sales transaction submission
+- QR code generation
+- Sequential numbering
+- 24-hour offline enforcement
+- Copy receipt validation
+- Retry queue with exponential backoff
+- Secure CMC key encryption
+
+**What's Missing:**
+- PDF receipt templates
+- Z/X report generation
+- Complete API coverage (Code/Item/Purchase)
+- Mobile app UI updates
 
 ---
 
@@ -271,12 +351,52 @@ We provide a complete Postman collection with:
 - **Postman Collection**: Ready-to-use test suite
 - **Setup Guides**: Step-by-step installation
 - **Troubleshooting**: Common issues and solutions
+- **Compliance Report**: `/KRA_ETIMS_COMPLIANCE_REPORT.md`
 
 ### Getting Help
 - **Technical Support**: For system issues
 - **Integration Support**: For connecting your POS
 - **Training**: For your team
 - **Compliance Guidance**: For KRA requirements
+
+---
+
+## Recent Updates (November 2025)
+
+### Backend Enhancements
+- Added `ComplianceService` for KRA business rule enforcement
+- Implemented `QRCodeService` for automatic QR generation
+- Added 5 new database fields for compliance tracking
+- Sequential invoice numbering with database-level locking
+- 24-hour offline prevention logic
+- **Automatic device initialization** during user registration
+- **Seamless onboarding** - no manual device setup required
+
+### API Improvements
+- Enhanced invoice validation with compliance checks
+- Device certification verification
+- Copy receipt validation
+- Transaction type validation
+- **Auto-create company and device** on registration
+- **Async device initialization** with Celery
+
+### User Experience
+- **Streamlined registration** - one-step process
+- **Automatic device provisioning** - VSCU device created automatically
+- **Background KRA initialization** - device activated asynchronously
+- **Immediate productivity** - start creating invoices right away
+- **Admin-managed devices** - use Django admin for device management
+
+### Files Added
+- `/kra_oscu/services/compliance_service.py`
+- `/kra_oscu/services/qr_service.py`
+- `/kra_oscu/migrations/0002_invoice_is_copy_...py`
+- `/KRA_ETIMS_COMPLIANCE_REPORT.md`
+- Updated: `/kra_oscu/api_views.py` - Auto device creation
+- Updated: `/kra_oscu/tasks.py` - Device initialization task
+
+### Dependencies
+- Installed: `qrcode[pil]` for QR code generation
 
 ---
 

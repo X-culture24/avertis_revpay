@@ -3,11 +3,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ApiResponse, DashboardStats, Invoice, IntegrationSettings, ComplianceReport, User, AuthTokens } from '@/types';
 
 // Network configuration - use ngrok tunnel for external access
-const BASE_URL = __DEV__ ? 'https://ce332d1080ca.ngrok-free.app' : 'https://your-production-api.com';
+const BASE_URL = __DEV__ ? 'https://5b47348c2dfb.ngrok-free.app' : 'https://your-production-api.com';
 
 // Single server configuration using ngrok tunnel
 const POSSIBLE_URLS = [
-  'https://ce332d1080ca.ngrok-free.app', // ngrok tunnel for external access
+  'https://5b47348c2dfb.ngrok-free.app', // ngrok tunnel for external access
 ];
 
 class ApiService {
@@ -284,7 +284,7 @@ class ApiService {
   }
 
   async createInvoice(invoiceData: any) {
-    return this.request('POST', '/invoices/create/', invoiceData);
+    return this.request('POST', '/invoices/', invoiceData);
   }
 
   async getInvoiceDetails(invoiceId: string) {
@@ -293,6 +293,12 @@ class ApiService {
 
   async resyncInvoice(invoiceId: string) {
     return this.request('POST', `/invoices/${invoiceId}/resync/`);
+  }
+
+  async retryAllFailed() {
+    // Note: Backend endpoint exists at /invoices/retry-all/ but not in mobile API
+    // This will need to be added to mobile API endpoints
+    return this.request('POST', '/invoices/retry-all/');
   }
 
   // Dashboard

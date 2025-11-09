@@ -10,7 +10,8 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
-from django.db.models import Count, Sum, Avg, Q
+from django.db import models
+from django.db.models import Count, Sum, Avg, Q, Max
 from django.utils import timezone
 from datetime import timedelta, datetime
 from decimal import Decimal
@@ -108,8 +109,30 @@ def register_user(request):
             contact_phone=data['contact_phone'],
             business_address=data['business_address'],
             business_type=data.get('business_type', ''),
-            status='pending_approval'
+            status='active',  # Auto-activate company
+            is_sandbox=True  # Start in sandbox mode
         )
+        
+        # Auto-create default device for the company
+        import uuid
+        from datetime import datetime
+        
+        device_serial = f"DEV-{company.tin}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        device = Device.objects.create(
+            company=company,
+            device_type='vscu',  # Default to VSCU (virtual) for easier setup
+            integration_type='mobile_app',
+            tin=company.tin,
+            bhf_id='000',  # Default branch
+            serial_number=device_serial,
+            device_name=f"{company.company_name} - Default Device",
+            status='pending',
+            pos_version='1.0'
+        )
+        
+        # Initialize device with KRA asynchronously
+        from .tasks import initialize_device_with_kra
+        initialize_device_with_kra.delay(str(device.id))
         
         # Generate tokens
         refresh = RefreshToken.for_user(user)
@@ -125,6 +148,13 @@ def register_user(request):
                 'is_active': user.is_active,
                 'date_joined': user.date_joined.isoformat(),
                 'company': CompanySerializer(company).data
+            },
+            'device': {
+                'id': str(device.id),
+                'serial_number': device.serial_number,
+                'status': device.status,
+                'device_type': device.device_type,
+                'message': 'Device initialization in progress. You can start creating invoices once device is active.'
             }
         }, status=status.HTTP_201_CREATED)
         
@@ -331,18 +361,40 @@ class InvoiceListCreateView(generics.ListCreateAPIView):
             return Invoice.objects.none()
     
     def perform_create(self, serializer):
+        from .services.compliance_service import ComplianceService
+        from rest_framework.exceptions import ValidationError
+        
         company = Company.objects.get(contact_email=self.request.user.email)
         
         # Get the first active device for this company
         device = Device.objects.filter(company=company, status='active').first()
         if not device:
-            raise ValueError('No active device found for this company')
+            raise ValidationError('No active device found for this company')
         
-        # Create invoice
+        # Check device certification
+        is_certified, cert_msg = ComplianceService.check_device_certification(device)
+        if not is_certified:
+            raise ValidationError(cert_msg)
+        
+        # Check 24-hour offline rule
+        can_create, offline_msg = ComplianceService.can_create_invoice(device)
+        if not can_create:
+            raise ValidationError(offline_msg)
+        
+        # Validate copy receipt requirements
+        is_valid_copy, copy_msg = ComplianceService.validate_receipt_copy(self.request.data)
+        if not is_valid_copy:
+            raise ValidationError(copy_msg)
+        
+        # Generate sequential invoice number
+        invoice_no = device.get_next_receipt_number()
+        
+        # Create invoice with generated invoice number
         invoice = serializer.save(
             company=company,
             device=device,
-            tin=company.tin
+            tin=company.tin,
+            invoice_no=invoice_no
         )
         
         # Create invoice items
@@ -358,6 +410,10 @@ class InvoiceListCreateView(generics.ListCreateAPIView):
                 tax_rate=self.get_tax_rate(item_data['tax_type']),
                 unit_of_measure=item_data['unit_of_measure']
             )
+        
+        # Generate QR code for the invoice
+        from .services.qr_service import QRCodeService
+        QRCodeService.update_invoice_qr(invoice)
         
         # Trigger async processing
         from .tasks import retry_sales_invoice
@@ -422,6 +478,55 @@ def resync_invoice(request, invoice_id):
     except (Company.DoesNotExist, Invoice.DoesNotExist):
         return Response(
             {'error': 'Invoice not found'}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def retry_all_failed(request):
+    """Retry all failed invoices for the authenticated user's company"""
+    try:
+        company = Company.objects.get(contact_email=request.user.email)
+        
+        # Get all failed invoices
+        failed_invoices = Invoice.objects.filter(
+            company=company,
+            status__in=['failed', 'retry']
+        )
+        
+        count = failed_invoices.count()
+        
+        if count == 0:
+            return Response({'message': 'No failed invoices to retry'})
+        
+        # Queue all failed invoices for retry
+        for invoice in failed_invoices:
+            # Create retry queue entry if not exists
+            RetryQueue.objects.get_or_create(
+                invoice=invoice,
+                defaults={
+                    'task_type': 'sales_retry',
+                    'next_retry': timezone.now(),
+                    'error_details': 'Manual retry all requested'
+                }
+            )
+            
+            # Update invoice status
+            invoice.status = 'retry'
+            invoice.save()
+            
+            # Trigger async retry
+            retry_sales_invoice.delay(str(invoice.id))
+        
+        return Response({
+            'message': f'{count} invoice(s) queued for retry',
+            'count': count
+        })
+        
+    except Company.DoesNotExist:
+        return Response(
+            {'error': 'Company not found'}, 
             status=status.HTTP_404_NOT_FOUND
         )
 
@@ -616,7 +721,7 @@ def vscu_status(request):
             'pending_invoices': pending_invoices,
             'retry_queue_size': retry_queue_count,
             'last_sync': vscu_devices.filter(last_sync__isnull=False).aggregate(
-                latest=timezone.models.Max('last_sync')
+                latest=Max('last_sync')
             )['latest']
         })
         

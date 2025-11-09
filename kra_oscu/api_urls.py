@@ -18,6 +18,7 @@ from .api_views import (
     InvoiceListCreateView,
     InvoiceDetailView,
     resync_invoice,
+    retry_all_failed,
     ItemMasterListCreateView,
     ComplianceReportListView,
     generate_report,
@@ -53,6 +54,7 @@ urlpatterns = [
     path('invoices/', InvoiceListCreateView.as_view(), name='invoice_list_create'),
     path('invoices/<uuid:pk>/', InvoiceDetailView.as_view(), name='invoice_detail'),
     path('invoices/<uuid:invoice_id>/resync/', resync_invoice, name='resync_invoice'),
+    path('invoices/retry-all/', retry_all_failed, name='retry_all_failed'),
     
     # Item master endpoints
     path('items/', ItemMasterListCreateView.as_view(), name='item_list_create'),

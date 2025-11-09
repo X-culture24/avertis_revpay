@@ -10,6 +10,50 @@
 			"name": "1. Authentication",
 			"item": [
 				{
+					"name": "Register User (Auto Device Init)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    var jsonData = pm.response.json();",
+									"    if (jsonData.tokens && jsonData.tokens.access) {",
+									"        pm.environment.set('jwt_access_token', jsonData.tokens.access);",
+									"        pm.environment.set('jwt_refresh_token', jsonData.tokens.refresh);",
+									"        pm.environment.set('user_id', jsonData.user.id);",
+									"        pm.environment.set('user_email', jsonData.user.email);",
+									"        pm.environment.set('device_id', jsonData.device.id);",
+									"        pm.environment.set('device_serial', jsonData.device.serial_number);",
+									"        console.log('User registered successfully');",
+									"        console.log('Device auto-initialized:', jsonData.device.serial_number);",
+									"    }",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"company_name\": \"Test Company Ltd\",\n    \"tin\": \"P051234567A\",\n    \"contact_person\": \"John Doe\",\n    \"contact_email\": \"john.doe@testcompany.com\",\n    \"contact_phone\": \"+254712345678\",\n    \"business_address\": \"123 Business Street, Nairobi\",\n    \"business_type\": \"Retail\",\n    \"password\": \"SecurePass123!\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/mobile/auth/register/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "mobile", "auth", "register", ""]
+						},
+						"description": "Register new user with automatic company and device creation. Device is initialized with KRA in background. No manual device setup required."
+					}
+				},
+				{
 					"name": "Login (Get JWT Token)",
 					"event": [
 						{

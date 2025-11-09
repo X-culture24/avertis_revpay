@@ -281,6 +281,35 @@ class Device(BaseModel, EncryptionMixin):
     def is_virtual_integration(self):
         """Check if this is a virtual/API-only integration"""
         return self.device_type == 'vscu'
+    
+    def get_next_receipt_number(self):
+        """
+        Generate next sequential receipt number for this device.
+        Format: DEVICE_SERIAL-YYYYMMDD-SEQUENCE
+        Thread-safe using database-level locking.
+        """
+        from django.db import transaction
+        from datetime import datetime
+        
+        today = datetime.now().strftime('%Y%m%d')
+        prefix = f"{self.serial_number}-{today}-"
+        
+        # Get last invoice for today with database lock
+        with transaction.atomic():
+            last_invoice = Invoice.objects.select_for_update().filter(
+                device=self,
+                invoice_no__startswith=prefix
+            ).order_by('-invoice_no').first()
+            
+            if last_invoice:
+                # Extract sequence number and increment
+                last_seq = int(last_invoice.invoice_no.split('-')[-1])
+                next_seq = last_seq + 1
+            else:
+                # First invoice of the day
+                next_seq = 1
+            
+            return f"{prefix}{next_seq:06d}"
 
 
 class ItemMaster(BaseModel):
@@ -353,6 +382,18 @@ class Invoice(BaseModel):
         ('BANK', 'Bank Transfer'),
         ('CREDIT', 'Credit Sale'),
     ]
+    
+    RECEIPT_TYPE_CHOICES = [
+        ('normal', 'Normal Sale'),
+        ('copy', 'Copy Receipt'),
+        ('proforma', 'Proforma Invoice'),
+        ('training', 'Training Mode'),
+    ]
+    
+    TRANSACTION_TYPE_CHOICES = [
+        ('sale', 'Sale'),
+        ('refund', 'Refund/Credit Note'),
+    ]
 
     # Invoice identification
     invoice_no = models.CharField(
@@ -409,6 +450,35 @@ class Invoice(BaseModel):
         choices=PAYMENT_TYPE_CHOICES,
         default='CASH',
         help_text="Payment method"
+    )
+    
+    # KRA Compliance Fields
+    receipt_type = models.CharField(
+        max_length=20,
+        choices=RECEIPT_TYPE_CHOICES,
+        default='normal',
+        help_text="Receipt type per KRA specification"
+    )
+    transaction_type = models.CharField(
+        max_length=20,
+        choices=TRANSACTION_TYPE_CHOICES,
+        default='sale',
+        help_text="Transaction type (sale or refund)"
+    )
+    qr_code_data = models.TextField(
+        blank=True,
+        null=True,
+        help_text="QR code data for receipt"
+    )
+    is_copy = models.BooleanField(
+        default=False,
+        help_text="Is this a copy of the original receipt"
+    )
+    original_receipt_no = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
+        help_text="Original receipt number if this is a copy"
     )
     
     # KRA response data

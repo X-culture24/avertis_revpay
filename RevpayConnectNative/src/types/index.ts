@@ -111,6 +111,10 @@ export type RootStackParamList = {
   Profile: undefined;
   CompanyRegistration: undefined;
   DeviceSetup: undefined;
+  Notifications: undefined;
+  Subscription: undefined;
+  HelpSupport: undefined;
+  DataStorage: undefined;
 };
 
 export type MainStackParamList = {

@@ -32,14 +32,23 @@ const InvoicesScreen: React.FC = () => {
   const fetchInvoices = async () => {
     setInvoices(prev => ({ ...prev, loading: true }));
     try {
+      console.log('📋 Fetching invoices...');
       const response = await apiService.getInvoices();
+      console.log('📋 Invoices response:', response);
+      
       if (response.success && response.data) {
+        // Handle Django paginated response structure
+        const invoicesData = (response.data as any).results || response.data;
+        console.log('📋 Invoices data:', invoicesData);
+        console.log('📋 Number of invoices:', Array.isArray(invoicesData) ? invoicesData.length : 0);
+        
         setInvoices({
-          invoices: response.data,
+          invoices: Array.isArray(invoicesData) ? invoicesData : [],
           loading: false,
           error: null,
         });
       } else {
+        console.error('📋 Failed to fetch invoices:', response.message);
         setInvoices(prev => ({
           ...prev,
           loading: false,
@@ -47,6 +56,7 @@ const InvoicesScreen: React.FC = () => {
         }));
       }
     } catch (error) {
+      console.error('📋 Error fetching invoices:', error);
       setInvoices(prev => ({
         ...prev,
         loading: false,
@@ -78,60 +88,75 @@ const InvoicesScreen: React.FC = () => {
   };
 
   const getStatusText = (status: string) => {
-    switch (status) {
-      case 'PENDING':
-        return 'PENDING';
-      case 'SUBMITTED':
-        return 'SUBMITTED';
-      case 'SYNCED':
-        return 'SYNCED';
-      case 'FAILED':
-        return 'FAILED';
-      default:
-        return status;
-    }
+    // Map backend status values to display values
+    const statusMap: { [key: string]: string } = {
+      'pending': 'PENDING',
+      'submitted': 'SUBMITTED',
+      'confirmed': 'SYNCED',
+      'failed': 'FAILED',
+      'retry': 'PENDING',
+    };
+    return statusMap[status?.toLowerCase()] || status?.toUpperCase() || 'UNKNOWN';
   };
 
-  const filteredInvoices = invoices.invoices.filter((invoice: Invoice) => {
-    const matchesSearch = (invoice.customerName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         (invoice.invoiceNumber || '').toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesFilter = filterStatus === 'ALL' || invoice.status === filterStatus;
+  const filteredInvoices = (invoices.invoices || []).filter((invoice: any) => {
+    const customerName = invoice.customer_name || invoice.customerName || '';
+    const invoiceNumber = invoice.invoice_no || invoice.invoiceNumber || '';
+    const matchesSearch = customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         invoiceNumber.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    // Map filter status to backend status values
+    let statusToMatch = filterStatus;
+    if (filterStatus === 'SYNCED') statusToMatch = 'confirmed';
+    if (filterStatus === 'PENDING') statusToMatch = 'pending';
+    if (filterStatus === 'FAILED') statusToMatch = 'failed';
+    
+    const matchesFilter = filterStatus === 'ALL' || 
+                         invoice.status?.toLowerCase() === statusToMatch.toLowerCase();
     return matchesSearch && matchesFilter;
   });
 
-  const renderInvoiceItem = ({ item }: { item: Invoice }) => (
-    <TouchableOpacity
-      onPress={() => navigation.navigate('InvoiceDetails', { invoiceId: item.id })}
-    >
-      <View style={styles.invoiceCard}>
-        <View style={styles.cardContent}>
-          <View style={styles.invoiceHeader}>
-            <View style={styles.invoiceInfo}>
-              <Text style={styles.invoiceNumber}>#{item.invoiceNumber || 'N/A'}</Text>
-              <Text style={styles.customerName}>{item.customerName || 'Unknown Customer'}</Text>
-            </View>
-            <View style={styles.invoiceAmount}>
-              <Text style={styles.amount}>KSh {(item.totalAmount || 0).toLocaleString()}</Text>
-              <View style={styles.statusChip}>
-                <Text style={styles.statusText}>
-                  {item.status || 'UNKNOWN'}
-                </Text>
+  const renderInvoiceItem = ({ item }: { item: any }) => {
+    const invoiceNumber = item.invoice_no || item.invoiceNumber || 'N/A';
+    const customerName = item.customer_name || item.customerName || 'Unknown Customer';
+    const totalAmount = item.total_amount || item.totalAmount || 0;
+    const createdAt = item.created_at || item.createdAt;
+    const integrationMode = item.integration_mode || item.integrationMode;
+    
+    return (
+      <TouchableOpacity
+        onPress={() => navigation.navigate('InvoiceDetails', { invoiceId: item.id })}
+      >
+        <View style={styles.invoiceCard}>
+          <View style={styles.cardContent}>
+            <View style={styles.invoiceHeader}>
+              <View style={styles.invoiceInfo}>
+                <Text style={styles.invoiceNumber}>#{invoiceNumber}</Text>
+                <Text style={styles.customerName}>{customerName}</Text>
+              </View>
+              <View style={styles.invoiceAmount}>
+                <Text style={styles.amount}>KSh {parseFloat(totalAmount).toLocaleString()}</Text>
+                <View style={styles.statusChip}>
+                  <Text style={styles.statusText}>
+                    {getStatusText(item.status)}
+                  </Text>
+                </View>
               </View>
             </View>
-          </View>
-          
-          <View style={styles.invoiceFooter}>
-            <Text style={styles.dateText}>
-              {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : 'No date'}
-            </Text>
-            {item.integrationMode && (
-              <Text style={styles.modeText}>{item.integrationMode}</Text>
-            )}
+            
+            <View style={styles.invoiceFooter}>
+              <Text style={styles.dateText}>
+                {createdAt ? new Date(createdAt).toLocaleDateString() : 'No date'}
+              </Text>
+              {integrationMode && (
+                <Text style={styles.modeText}>{integrationMode}</Text>
+              )}
+            </View>
           </View>
         </View>
-      </View>
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   const renderEmptyState = () => (
     <View style={styles.emptyState}>

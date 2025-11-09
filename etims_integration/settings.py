@@ -22,7 +22,7 @@ ALLOWED_HOSTS = [
     'localhost',
     '127.0.0.1',
     '0.0.0.0',
-    '056211fc8ef6.ngrok-free.app',  # ngrok tunnel domain
+    'https://ce332d1080ca.ngrok-free.app',  # ngrok tunnel domain
     '*',               # Allow all hosts for development
 ]
 

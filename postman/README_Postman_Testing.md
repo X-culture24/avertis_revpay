@@ -38,11 +38,16 @@ This guide provides comprehensive instructions for testing the Revpay Connect mo
 ## Mobile API Testing Workflow
 
 ### 1. Authentication (JWT)
-1. **Login**: Use "Login (Get JWT Token)" request
+1. **Register** (NEW): Use "Register User (Auto Device Init)" request
+   - Creates user account, company, and device automatically
+   - Device initialized with KRA in background
+   - Automatically saves JWT tokens to environment
+   - No manual device setup required
+2. **Login**: Use "Login (Get JWT Token)" request
    - Automatically saves JWT tokens to environment
    - Sets user information variables
-2. **Token Refresh**: Use "Refresh JWT Token" when needed
-3. **Logout**: Clean logout with token invalidation
+3. **Token Refresh**: Use "Refresh JWT Token" when needed
+4. **Logout**: Clean logout with token invalidation
 
 ### 2. Dashboard & Analytics
 1. **Dashboard Stats**: Get real-time statistics
@@ -87,6 +92,7 @@ Authorization: Bearer {{jwt_access_token}}
 ## Mobile App API Endpoints
 
 ### Authentication Endpoints
+- `POST /api/mobile/auth/register/` - Register user (auto device init)
 - `POST /api/mobile/auth/login/` - JWT login
 - `POST /api/mobile/auth/refresh/` - Refresh JWT token
 - `POST /api/mobile/auth/logout/` - Logout
@@ -122,12 +128,20 @@ Authorization: Bearer {{jwt_access_token}}
 
 ## Testing Scenarios
 
-### Complete Mobile App Flow
+### Complete Mobile App Flow (NEW USER)
+1. **Register** → Create account + auto device init
+2. **Dashboard** → Fetch statistics
+3. **Create Invoice** → Submit new invoice (device ready)
+4. **View Invoices** → List and filter
+5. **Reports** → Generate compliance reports
+6. **Logout** → Clean session end
+
+### Complete Mobile App Flow (EXISTING USER)
 1. **Login** → Get JWT tokens
 2. **Dashboard** → Fetch statistics
 3. **Create Invoice** → Submit new invoice
 4. **View Invoices** → List and filter
-5. **Device Management** → Register/sync devices
+5. **Device Management** → View device status (read-only)
 6. **Reports** → Generate compliance reports
 7. **Logout** → Clean session end
 

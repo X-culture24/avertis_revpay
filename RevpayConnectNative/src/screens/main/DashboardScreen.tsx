@@ -142,6 +142,23 @@ const DashboardScreen: React.FC = () => {
     }
   };
 
+  const handleRetryFailed = async () => {
+    try {
+      console.log('🔄 Retrying failed invoices...');
+      const response = await apiService.retryAllFailed();
+      
+      if (response.success) {
+        Alert.alert('Success', 'Failed invoices queued for retry');
+        await fetchDashboardData(); // Refresh data
+      } else {
+        Alert.alert('Error', response.message || 'Failed to retry invoices');
+      }
+    } catch (error) {
+      console.error('❌ Error retrying failed invoices:', error);
+      Alert.alert('Error', 'Failed to retry invoices. Please try again.');
+    }
+  };
+
 
   return (
     <SafeAreaView style={styles.container}>
@@ -215,6 +232,11 @@ const DashboardScreen: React.FC = () => {
             <Text style={[styles.statusValue, { color: getStatusColor('failed') }]}>
               {dashboardStats?.failed_invoices || 0}
             </Text>
+            {(dashboardStats?.failed_invoices || 0) > 0 && (
+              <TouchableOpacity onPress={handleRetryFailed} style={styles.retryButton}>
+                <Text style={styles.retryButtonText}>Retry All</Text>
+              </TouchableOpacity>
+            )}
             {retryQueueSize > 0 && (
               <Text style={styles.statusSubtext}>{retryQueueSize} in retry queue</Text>
             )}
@@ -239,7 +261,7 @@ const DashboardScreen: React.FC = () => {
         <View style={styles.quickActionsContainer}>
           <TouchableOpacity 
             style={styles.quickActionCard}
-            onPress={() => (navigation as any).navigate('CreateInvoice')}
+            onPress={() => (navigation as any).navigate('Invoices', { screen: 'CreateInvoice' })}
           >
             <Text style={styles.quickActionTitle}>Create Invoice</Text>
             <Text style={styles.quickActionSubtitle}>New transaction</Text>
@@ -617,6 +639,19 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textSecondary,
     marginTop: spacing.xs / 2,
+  },
+  retryButton: {
+    marginTop: spacing.xs,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    backgroundColor: colors.primary,
+    borderRadius: 4,
+    alignSelf: 'flex-start',
+  },
+  retryButtonText: {
+    color: colors.secondary,
+    fontSize: 12,
+    fontWeight: '600',
   },
   // Legacy styles for compatibility
   quickAction: {

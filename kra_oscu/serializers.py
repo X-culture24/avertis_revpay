@@ -175,12 +175,13 @@ class InvoiceSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'invoice_no', 'receipt_no', 'device_serial_number', 'tin',
             'total_amount', 'tax_amount', 'currency', 'customer_tin', 'customer_name',
-            'payment_type', 'status', 'transaction_date', 'retry_count', 'items',
-            'created_at', 'updated_at'
+            'payment_type', 'receipt_type', 'transaction_type', 'is_copy', 
+            'original_receipt_no', 'qr_code_data', 'status', 'transaction_date', 
+            'retry_count', 'items', 'created_at', 'updated_at'
         ]
         read_only_fields = [
             'id', 'receipt_no', 'internal_data', 'receipt_signature', 
-            'status', 'retry_count', 'created_at', 'updated_at'
+            'qr_code_data', 'status', 'retry_count', 'created_at', 'updated_at'
         ]
 
     def validate_device_serial_number(self, value):
@@ -205,9 +206,18 @@ class InvoiceSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         """Cross-field validation"""
+        from .services.compliance_service import ComplianceService
+        
         items = data.get('items', [])
         if not items:
             raise serializers.ValidationError("Invoice must contain at least one item")
+        
+        # Validate transaction type vs amount
+        transaction_type = data.get('transaction_type', 'sale')
+        total_amount = float(data.get('total_amount', 0))
+        is_valid, msg = ComplianceService.validate_transaction_type(transaction_type, total_amount)
+        if not is_valid:
+            raise serializers.ValidationError(msg)
         
         # Calculate totals from items
         calculated_total = sum(

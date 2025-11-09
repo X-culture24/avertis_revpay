@@ -6,6 +6,7 @@ import {
   ScrollView,
   Alert,
   TouchableOpacity,
+  Image,
 } from 'react-native';
 // Using native React Native components instead of react-native-paper
 import { useRoute, useNavigation } from '@react-navigation/native';
@@ -30,7 +31,36 @@ const InvoiceDetailsScreen: React.FC = () => {
       console.log('Invoice details response:', response);
       
       if (response.success && response.data) {
-        setInvoice(response.data as Invoice);
+        // Handle API response format compatibility
+        const invoiceData = response.data as any;
+        const normalizedInvoice = {
+          ...invoiceData,
+          id: invoiceData.id || invoiceData.invoice_id || invoiceId,
+          invoiceNumber: invoiceData.invoice_no || invoiceData.invoiceNumber || 'N/A',
+          customerName: invoiceData.customer_name || invoiceData.customerName || 'Unknown Customer',
+          customerPin: invoiceData.customer_tin || invoiceData.customerPin || '',
+          amount: parseFloat(invoiceData.amount || invoiceData.total_amount || '0'),
+          taxAmount: parseFloat(invoiceData.tax_amount || invoiceData.taxAmount || '0'),
+          totalAmount: parseFloat(invoiceData.total_amount || invoiceData.totalAmount || '0'),
+          createdAt: invoiceData.created_at || invoiceData.createdAt || new Date().toISOString(),
+          updatedAt: invoiceData.updated_at || invoiceData.updatedAt || new Date().toISOString(),
+          status: invoiceData.status || 'PENDING',
+          integrationMode: invoiceData.integration_mode || invoiceData.integrationMode || 'OSCU',
+          retryCount: invoiceData.retry_count || invoiceData.retryCount || 0,
+          receiptType: invoiceData.receipt_type || invoiceData.receiptType || 'normal',
+          transactionType: invoiceData.transaction_type || invoiceData.transactionType || 'sale',
+          qrCodeData: invoiceData.qr_code_data || invoiceData.qrCodeData || null,
+          receiptNo: invoiceData.receipt_no || invoiceData.receiptNo || null,
+          items: (invoiceData.items || []).map((item: any) => ({
+            ...item,
+            description: item.description || item.item_description || 'No description',
+            unitPrice: parseFloat(item.unit_price || item.unitPrice || '0'),
+            totalAmount: parseFloat(item.total_amount || item.totalAmount || '0'),
+            taxRate: parseFloat(item.tax_rate || item.taxRate || '0') / 100, // Convert percentage to decimal
+            quantity: parseFloat(item.quantity || '0'),
+          })),
+        };
+        setInvoice(normalizedInvoice as Invoice);
       } else {
         console.error('Failed to fetch invoice details:', response.message);
         Alert.alert('Error', response.message || 'Failed to load invoice details');
@@ -44,7 +74,7 @@ const InvoiceDetailsScreen: React.FC = () => {
   };
 
   const handleResync = async () => {
-    if (!invoice) return;
+    if (!invoice || !invoice.id) return;
     
     setResyncing(true);
     try {
@@ -56,6 +86,7 @@ const InvoiceDetailsScreen: React.FC = () => {
         Alert.alert('Error', response.message || 'Failed to resync invoice');
       }
     } catch (error) {
+      console.error('Resync error:', error);
       Alert.alert('Error', 'Network error. Please try again.');
     } finally {
       setResyncing(false);
@@ -116,18 +147,18 @@ const InvoiceDetailsScreen: React.FC = () => {
         <View style={styles.cardContent}>
           <View style={styles.headerContent}>
             <View style={styles.invoiceInfo}>
-              <Text style={styles.invoiceNumber}>#{invoice.invoiceNumber}</Text>
-              <Text style={styles.customerName}>{invoice.customerName}</Text>
-              {invoice.customerPin && (
+              <Text style={styles.invoiceNumber}>#{invoice.invoiceNumber || 'N/A'}</Text>
+              <Text style={styles.customerName}>{invoice.customerName || 'Unknown Customer'}</Text>
+              {invoice.customerPin ? (
                 <Text style={styles.customerPin}>PIN: {invoice.customerPin}</Text>
-              )}
+              ) : null}
             </View>
             <View style={styles.statusContainer}>
               <View
                 style={[styles.statusChip, { borderColor: getStatusColor(invoice.status) }]}
               >
                 <Text style={[styles.statusText, { color: getStatusColor(invoice.status) }]}>
-                  {invoice.status}
+                  {invoice.status || 'PENDING'}
                 </Text>
               </View>
             </View>
@@ -143,28 +174,40 @@ const InvoiceDetailsScreen: React.FC = () => {
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Created:</Text>
             <Text style={styles.detailValue}>
-              {new Date(invoice.createdAt).toLocaleString()}
+              {(() => {
+                try {
+                  return new Date(invoice.createdAt || new Date()).toLocaleString();
+                } catch (e) {
+                  return 'Invalid date';
+                }
+              })()}
             </Text>
           </View>
           
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Last Updated:</Text>
             <Text style={styles.detailValue}>
-              {new Date(invoice.updatedAt).toLocaleString()}
+              {(() => {
+                try {
+                  return new Date(invoice.updatedAt || new Date()).toLocaleString();
+                } catch (e) {
+                  return 'Invalid date';
+                }
+              })()}
             </Text>
           </View>
           
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Integration Mode:</Text>
-            <Text style={styles.detailValue}>{invoice.integrationMode}</Text>
+            <Text style={styles.detailValue}>{invoice.integrationMode || 'OSCU'}</Text>
           </View>
           
-          {invoice.retryCount && invoice.retryCount > 0 && (
+          {invoice.retryCount && invoice.retryCount > 0 ? (
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Retry Count:</Text>
               <Text style={styles.detailValue}>{invoice.retryCount}</Text>
             </View>
-          )}
+          ) : null}
         </View>
       </View>
 
@@ -175,25 +218,48 @@ const InvoiceDetailsScreen: React.FC = () => {
           
           {invoice.items?.map((item, index) => (
             <View key={item.id || index} style={styles.itemContainer}>
-              <Text style={styles.itemDescription}>{item.description}</Text>
+              <Text style={styles.itemDescription}>{item.description || 'No description'}</Text>
               <View style={styles.itemDetails}>
                 <Text style={styles.itemDetail}>
-                  Qty: {item.quantity} × KSh {item.unitPrice.toLocaleString()}
+                  Qty: {item.quantity || 0} × KSh {(item.unitPrice || 0).toLocaleString()}
                 </Text>
                 <Text style={styles.itemDetail}>
                   Tax: {((item.taxRate || 0) * 100).toFixed(0)}%
                 </Text>
               </View>
               <Text style={styles.itemTotal}>
-                KSh {item.totalAmount.toLocaleString()}
+                KSh {(item.totalAmount || 0).toLocaleString()}
               </Text>
-              {index < (invoice.items?.length || 0) - 1 && (
+              {index < (invoice.items?.length || 0) - 1 ? (
                 <View style={styles.itemDivider} />
-              )}
+              ) : null}
             </View>
           ))}
         </View>
       </View>
+
+      {/* QR Code Section */}
+      {invoice.qrCodeData ? (
+        <View style={styles.card}>
+          <View style={styles.cardContent}>
+            <Text style={styles.sectionTitle}>Receipt QR Code</Text>
+            <View style={styles.qrContainer}>
+              <Image
+                source={{ uri: `data:image/png;base64,${invoice.qrCodeData}` }}
+                style={styles.qrCode}
+                resizeMode="contain"
+              />
+              <Text style={styles.qrLabel}>Scan for verification</Text>
+            </View>
+            {invoice.receiptNo && (
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>KRA Receipt No:</Text>
+                <Text style={styles.detailValue}>{invoice.receiptNo}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      ) : null}
 
       {/* Totals */}
       <View style={styles.card}>
@@ -203,14 +269,14 @@ const InvoiceDetailsScreen: React.FC = () => {
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Subtotal:</Text>
             <Text style={styles.summaryValue}>
-              KSh {invoice.amount.toLocaleString()}
+              KSh {(invoice.amount || 0).toLocaleString()}
             </Text>
           </View>
           
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Tax Amount:</Text>
             <Text style={styles.summaryValue}>
-              KSh {invoice.taxAmount.toLocaleString()}
+              KSh {(invoice.taxAmount || 0).toLocaleString()}
             </Text>
           </View>
           
@@ -219,46 +285,58 @@ const InvoiceDetailsScreen: React.FC = () => {
           <View style={styles.summaryRow}>
             <Text style={styles.summaryTotalLabel}>Total Amount:</Text>
             <Text style={styles.summaryTotalValue}>
-              KSh {invoice.totalAmount.toLocaleString()}
+              KSh {(invoice.totalAmount || 0).toLocaleString()}
             </Text>
           </View>
         </View>
       </View>
 
       {/* Submission Details */}
-      {(invoice.jsonPayload || invoice.submissionResponse) && (
+      {(invoice.jsonPayload || invoice.submissionResponse) ? (
         <View style={styles.card}>
           <View style={styles.cardContent}>
             <Text style={styles.sectionTitle}>Submission Details</Text>
             
-            {invoice.jsonPayload && (
+            {invoice.jsonPayload ? (
               <View style={styles.submissionSection}>
                 <Text style={styles.submissionLabel}>Request Payload:</Text>
                 <View style={styles.codeContainer}>
                   <Text style={styles.codeText}>
-                    {JSON.stringify(JSON.parse(invoice.jsonPayload), null, 2)}
+                    {(() => {
+                      try {
+                        return JSON.stringify(JSON.parse(invoice.jsonPayload), null, 2);
+                      } catch (e) {
+                        return invoice.jsonPayload || '';
+                      }
+                    })()}
                   </Text>
                 </View>
               </View>
-            )}
+            ) : null}
             
-            {invoice.submissionResponse && (
+            {invoice.submissionResponse ? (
               <View style={styles.submissionSection}>
                 <Text style={styles.submissionLabel}>Response:</Text>
                 <View style={styles.codeContainer}>
                   <Text style={styles.codeText}>
-                    {JSON.stringify(JSON.parse(invoice.submissionResponse), null, 2)}
+                    {(() => {
+                      try {
+                        return JSON.stringify(JSON.parse(invoice.submissionResponse), null, 2);
+                      } catch (e) {
+                        return invoice.submissionResponse || '';
+                      }
+                    })()}
                   </Text>
                 </View>
               </View>
-            )}
+            ) : null}
           </View>
         </View>
-      )}
+      ) : null}
 
       {/* Actions */}
       <View style={styles.actionsContainer}>
-        {invoice.status === 'FAILED' && (
+        {invoice.status === 'FAILED' ? (
           <TouchableOpacity
             onPress={handleResync}
             disabled={resyncing}
@@ -268,9 +346,9 @@ const InvoiceDetailsScreen: React.FC = () => {
               {resyncing ? 'Retrying...' : 'Retry Sync'}
             </Text>
           </TouchableOpacity>
-        )}
+        ) : null}
         
-        {invoice.status === 'PENDING' && invoice.integrationMode === 'VSCU' && (
+        {invoice.status === 'PENDING' && invoice.integrationMode === 'VSCU' ? (
           <TouchableOpacity
             onPress={handleResync}
             disabled={resyncing}
@@ -280,7 +358,7 @@ const InvoiceDetailsScreen: React.FC = () => {
               {resyncing ? 'Syncing...' : 'Manual Sync'}
             </Text>
           </TouchableOpacity>
-        )}
+        ) : null}
       </View>
     </ScrollView>
   );
@@ -414,6 +492,7 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   itemDivider: {
+    height: 1,
     marginTop: spacing.md,
     backgroundColor: colors.border,
   },
@@ -431,6 +510,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   summaryDivider: {
+    height: 1,
     marginVertical: spacing.md,
     backgroundColor: colors.border,
   },
@@ -463,6 +543,20 @@ const styles = StyleSheet.create({
     ...typography.caption,
     fontFamily: 'monospace',
     color: colors.text,
+  },
+  qrContainer: {
+    alignItems: 'center',
+    paddingVertical: spacing.lg,
+  },
+  qrCode: {
+    width: 200,
+    height: 200,
+    marginBottom: spacing.md,
+  },
+  qrLabel: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    textAlign: 'center',
   },
   actionsContainer: {
     padding: spacing.md,

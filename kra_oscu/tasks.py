@@ -23,6 +23,64 @@ from .services.notification_service import (
 logger = logging.getLogger(__name__)
 
 
+@shared_task(bind=True, max_retries=3)
+def initialize_device_with_kra(self, device_id: str):
+    """
+    Initialize device with KRA and obtain CMC key.
+    Called automatically after user registration.
+    """
+    try:
+        device = Device.objects.get(id=device_id)
+        company = device.company
+        
+        logger.info(f"Initializing device {device.serial_number} for company {company.company_name}")
+        
+        # Initialize with KRA
+        kra_client = KRAClient()
+        result = kra_client.init_device(
+            tin=device.tin,
+            bhf_id=device.bhf_id,
+            serial_number=device.serial_number,
+            device_name=device.device_name
+        )
+        
+        if result.get('success'):
+            # Update device with CMC key
+            device.cmc_key = result.get('cmc_key')
+            device.status = 'active'
+            device.is_certified = True
+            device.certification_date = timezone.now()
+            device.last_sync = timezone.now()
+            device.save()
+            
+            logger.info(f"Device {device.serial_number} initialized successfully")
+            return {
+                'success': True,
+                'device_id': device_id,
+                'serial_number': device.serial_number,
+                'message': 'Device initialized with KRA'
+            }
+        else:
+            # Mark device as failed but keep it for manual retry
+            device.status = 'failed'
+            device.save()
+            
+            logger.error(f"Device initialization failed: {result.get('message')}")
+            return {
+                'success': False,
+                'device_id': device_id,
+                'error': result.get('message')
+            }
+            
+    except Device.DoesNotExist:
+        logger.error(f"Device {device_id} not found")
+        return {'success': False, 'error': 'Device not found'}
+    except Exception as e:
+        logger.error(f"Error initializing device {device_id}: {str(e)}")
+        # Retry with exponential backoff
+        raise self.retry(exc=e, countdown=60 * (2 ** self.request.retries))
+
+
 @shared_task(bind=True, max_retries=5)
 def retry_sales_invoice(self, invoice_id: str):
     """

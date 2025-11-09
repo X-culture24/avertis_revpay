@@ -11,6 +11,10 @@ import ReceiptScreen from '@/screens/main/ReceiptScreen';
 import ReportsScreen from '@/screens/main/ReportsScreen';
 import SettingsScreen from '@/screens/main/SettingsScreen';
 import ProfileScreen from '@/screens/main/ProfileScreen';
+import NotificationsScreen from '@/screens/main/NotificationsScreen';
+import SubscriptionScreen from '@/screens/main/SubscriptionScreen';
+import HelpSupportScreen from '@/screens/main/HelpSupportScreen';
+import DataStorageScreen from '@/screens/main/DataStorageScreen';
 import CompanyRegistrationScreen from '@/screens/setup/CompanyRegistrationScreen';
 import DeviceSetupScreen from '@/screens/setup/DeviceSetupScreen';
 import { MainTabParamList, RootStackParamList } from '@/types';
@@ -114,6 +118,38 @@ const SettingsStack = () => (
         headerBackTitleVisible: false,
       }}
     />
+    <Stack.Screen 
+      name="Notifications" 
+      component={NotificationsScreen}
+      options={{ 
+        title: 'Notifications',
+        headerBackTitleVisible: false,
+      }}
+    />
+    <Stack.Screen 
+      name="Subscription" 
+      component={SubscriptionScreen}
+      options={{ 
+        title: 'Subscription',
+        headerBackTitleVisible: false,
+      }}
+    />
+    <Stack.Screen 
+      name="HelpSupport" 
+      component={HelpSupportScreen}
+      options={{ 
+        title: 'Help & Support',
+        headerBackTitleVisible: false,
+      }}
+    />
+    <Stack.Screen 
+      name="DataStorage" 
+      component={DataStorageScreen}
+      options={{ 
+        title: 'Data & Storage',
+        headerBackTitleVisible: false,
+      }}
+    />
   </Stack.Navigator>
 );
 
@@ -147,7 +183,17 @@ const MainNavigator: React.FC = () => {
       })}
     >
       <Tab.Screen name="Dashboard" component={DashboardScreen} />
-      <Tab.Screen name="Invoices" component={InvoiceStack} />
+      <Tab.Screen 
+        name="Invoices" 
+        component={InvoiceStack}
+        options={{ title: 'Invoices' }}
+        listeners={({ navigation }) => ({
+          tabPress: (e) => {
+            // Navigate to InvoicesList when tab is pressed
+            navigation.navigate('Invoices', { screen: 'InvoicesList' });
+          },
+        })}
+      />
       <Tab.Screen name="Reports" component={ReportsScreen} />
       <Tab.Screen name="SettingsTab" component={SettingsStack} options={{ title: 'Settings' }} />
     </Tab.Navigator>

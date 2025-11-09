@@ -250,7 +250,7 @@ const SettingsScreen: React.FC = () => {
           
           <TouchableOpacity 
             style={styles.listItemContainer}
-            onPress={() => Alert.alert('Subscription', 'Subscription management coming soon!')}
+            onPress={() => (navigation as any).navigate('Subscription')}
           >
             <View style={styles.listItemContent}>
               <Text style={styles.listItemIcon}>💳</Text>
@@ -271,7 +271,7 @@ const SettingsScreen: React.FC = () => {
           
           <TouchableOpacity 
             style={styles.listItemContainer}
-            onPress={() => Alert.alert('Notifications', 'Notification settings coming soon!')}
+            onPress={() => (navigation as any).navigate('Notifications')}
           >
             <View style={styles.listItemContent}>
               <Text style={styles.listItemIcon}>🔔</Text>
@@ -287,7 +287,7 @@ const SettingsScreen: React.FC = () => {
           
           <TouchableOpacity 
             style={styles.listItemContainer}
-            onPress={() => Alert.alert('Data & Storage', 'Data management settings coming soon!')}
+            onPress={() => (navigation as any).navigate('DataStorage')}
           >
             <View style={styles.listItemContent}>
               <Text style={styles.listItemIcon}>💾</Text>
@@ -303,7 +303,7 @@ const SettingsScreen: React.FC = () => {
           
           <TouchableOpacity 
             style={styles.listItemContainer}
-            onPress={() => Alert.alert('Help & Support', 'Support center coming soon! For immediate help, contact support@revpay.co.ke')}
+            onPress={() => (navigation as any).navigate('HelpSupport')}
           >
             <View style={styles.listItemContent}>
               <Text style={styles.listItemIcon}>❓</Text>
