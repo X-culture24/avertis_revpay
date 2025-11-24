@@ -130,22 +130,11 @@ class KRAClient:
                      is_retry: bool = False) -> Dict[str, Any]:
         """Make HTTP request to KRA API with logging"""
         
-        # For sandbox environment, use mock responses when device is not registered
-        if settings.KRA_ENVIRONMENT == 'sandbox' and endpoint == "/etims-api/selectInitOsdcInfo":
-            # Try real KRA first, fallback to mock if device not registered
-            try:
-                url = f"{self.base_url}{endpoint}"
-                test_response = self.session.post(url, json=payload, timeout=5)
-                if test_response.status_code == 200:
-                    response_data = test_response.json()
-                    if response_data.get("resultCd") == "901":  # Not valid device
-                        logger.info("Device not registered in KRA sandbox, using mock response for testing")
-                        return self._get_mock_response(endpoint, payload)
-                    else:
-                        return response_data
-            except:
-                logger.info("KRA sandbox connection failed, using mock response for testing")
-                return self._get_mock_response(endpoint, payload)
+        # For sandbox environment, use mock responses for testing
+        if settings.KRA_ENVIRONMENT == 'sandbox':
+            # Always use mock responses in sandbox for reliable testing
+            logger.info(f"Using sandbox mock response for endpoint: {endpoint}")
+            return self._get_mock_response(endpoint, payload)
             
         url = f"{self.base_url}{endpoint}"
         request_payload = json.dumps(payload, indent=2)
@@ -295,6 +284,50 @@ class KRAClient:
             logger.error(f"Device initialization failed: {e}")
             raise
 
+    def verify_device_connection(self, device: Device) -> bool:
+        """
+        Verify device connection to KRA by testing CMC key validity.
+        Returns True if device can communicate with KRA, False otherwise.
+        """
+        try:
+            # Check if device has CMC key
+            if not device.cmc_key:
+                logger.warning(f"Device {device.serial_number} has no CMC key")
+                return False
+            
+            # Test connection by re-initializing device
+            # This validates CMC key and checks KRA connectivity
+            payload = {
+                "tin": device.tin,
+                "bhfId": device.bhf_id,
+                "dvcSrlNo": device.serial_number,
+                "dvcNm": device.device_name,
+                "cmcKey": device.cmc_key  # Include existing CMC key for validation
+            }
+            
+            logger.info(f"Verifying connection for device {device.serial_number}")
+            
+            # Call KRA status check endpoint
+            response = self._make_request(
+                endpoint="/etims-api/selectInitOsdcInfo",
+                payload=payload,
+                device=device,
+                request_type="verify"
+            )
+            
+            # Check if response is successful
+            if response.get("resultCd") == "000":
+                logger.info(f"Device {device.serial_number} is connected to KRA")
+                return True
+            else:
+                error_msg = response.get("resultMsg", "Unknown error")
+                logger.warning(f"Device {device.serial_number} connection failed: {error_msg}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error verifying device connection: {e}")
+            return False
+
     def send_sales_invoice(self, invoice: Invoice, is_retry: bool = False) -> Dict[str, Any]:
         """
         Send sales invoice to KRA OSCU.
@@ -308,7 +341,7 @@ class KRAClient:
             payload = builder.build_sales_payload(invoice)
             
             response = self._make_request(
-                endpoint="/etims-api/oscu/sales",
+                endpoint="/etims-api/saveTrnsSalesOsdc",
                 payload=payload,
                 device=invoice.device,
                 request_type="sales",

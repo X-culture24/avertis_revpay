@@ -493,6 +493,29 @@ class Invoice(BaseModel):
         help_text="KRA receipt signature"
     )
     
+    # DigiTax integration fields
+    digitax_id = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        help_text="DigiTax transaction ID"
+    )
+    etims_url = models.URLField(
+        blank=True,
+        null=True,
+        help_text="KRA eTIMS verification URL"
+    )
+    synced_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        help_text="Timestamp when synced to KRA"
+    )
+    error_message = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Error message from KRA submission"
+    )
+    
     # Status and timing
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     transaction_date = models.DateTimeField(help_text="Transaction timestamp")

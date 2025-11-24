@@ -45,9 +45,8 @@ mobile_api_urlpatterns = [
     # Dashboard
     path('dashboard/stats/', mobile_api_views.mobile_dashboard_stats, name='mobile-dashboard-stats'),
     
-    # Invoices
-    path('invoices/', mobile_api_views.mobile_invoices_list, name='mobile-invoices-list'),
-    path('invoices/create/', mobile_api_views.mobile_create_invoice, name='mobile-create-invoice'),
+    # Invoices - Handle both GET and POST on same endpoint
+    path('invoices/', mobile_api_views.mobile_invoices_handler, name='mobile-invoices'),
     path('invoices/<uuid:invoice_id>/', mobile_api_views.mobile_invoice_details, name='mobile-invoice-details'),
     path('invoices/<uuid:invoice_id>/resync/', mobile_api_views.mobile_resync_invoice, name='mobile-resync-invoice'),
     
@@ -56,6 +55,14 @@ mobile_api_urlpatterns = [
     
     # Notifications
     path('notifications/', mobile_api_views.mobile_notifications, name='mobile-notifications'),
+    
+    # DigiTax callback
+    path('callback/digitax/', mobile_api_views.digitax_callback, name='digitax-callback'),
+    
+    # KRA Compliance endpoints
+    path('codes/', api_views.get_kra_codes, name='kra-codes'),
+    path('reports/z-report/', api_views.generate_z_report, name='z-report'),
+    path('analytics/realtime/', api_views.get_real_time_analytics, name='realtime-analytics'),
 ]
 
 # API URL patterns

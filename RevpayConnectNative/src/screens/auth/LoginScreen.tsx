@@ -41,7 +41,7 @@ const LoginScreen: React.FC = () => {
     try {
       // Test connectivity first - try to find working URL
       console.log('Testing backend connectivity...');
-      console.log('Available URLs to test:', ['https://5b47348c2dfb.ngrok-free.app']);
+      console.log('Available URLs to test:', ['https://2ec64400f7cf.ngrok-free.app']);
       
       const workingURL = await apiService.findWorkingURL();
       console.log('🔍 Working URL result:', workingURL);
@@ -53,7 +53,7 @@ const LoginScreen: React.FC = () => {
         console.log('⚠️ No working URL found in test, but trying login anyway...');
         
         // Test each URL individually and show results
-        for (const url of ['https://5b47348c2dfb.ngrok-free.app']) {
+        for (const url of ['https://2ec64400f7cf.ngrok-free.app']) {
           try {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 3000);

@@ -46,11 +46,14 @@ const DashboardScreen: React.FC = () => {
         setLastSync(stats.last_sync);
       }
 
-      // Fetch recent invoices
-      const invoicesResponse = await apiService.getInvoices(1, 5);
+      // Fetch recent failed invoices only
+      const invoicesResponse = await apiService.getInvoices(1, 10);
       if (invoicesResponse.success && invoicesResponse.data && typeof invoicesResponse.data === 'object' && invoicesResponse.data !== null && 'results' in invoicesResponse.data) {
-        console.log('📄 Recent invoices received:', (invoicesResponse.data as any).results?.length || 0);
-        setRecentInvoices((invoicesResponse.data as any).results || []);
+        const allInvoices = (invoicesResponse.data as any).results || [];
+        // Filter to show only failed invoices
+        const failedInvoices = allInvoices.filter((inv: any) => inv.status === 'failed');
+        console.log('📄 Failed invoices received:', failedInvoices.length);
+        setRecentInvoices(failedInvoices.slice(0, 5)); // Show max 5 failed invoices
       }
       
       // Fetch devices
@@ -124,6 +127,11 @@ const DashboardScreen: React.FC = () => {
   const handleSyncDevices = async () => {
     try {
       console.log('🔄 Triggering device sync...');
+      
+      // Immediately update the lastSync timestamp to show current time
+      const currentTime = new Date().toISOString();
+      setLastSync(currentTime);
+      
       // Trigger sync for all devices
       for (const device of devices) {
         await apiService.syncDevice(device.id);
@@ -135,10 +143,12 @@ const DashboardScreen: React.FC = () => {
       }
       
       Alert.alert('Success', 'Device sync initiated successfully');
-      await fetchDashboardData(); // Refresh data
+      await fetchDashboardData(); // Refresh data to get updated backend timestamp
     } catch (error) {
       console.error('❌ Error syncing devices:', error);
       Alert.alert('Error', 'Failed to sync devices. Please try again.');
+      // Revert the optimistic update on error
+      await fetchDashboardData();
     }
   };
 
@@ -159,6 +169,23 @@ const DashboardScreen: React.FC = () => {
     }
   };
 
+  const handleRetryInvoice = async (invoiceId: string) => {
+    try {
+      console.log('🔄 Retrying invoice:', invoiceId);
+      const response = await apiService.resyncInvoice(invoiceId);
+      
+      if (response.success) {
+        Alert.alert('Success', 'Invoice queued for retry');
+        await fetchDashboardData(); // Refresh data
+      } else {
+        Alert.alert('Error', response.message || 'Failed to retry invoice');
+      }
+    } catch (error) {
+      console.error('❌ Error retrying invoice:', error);
+      Alert.alert('Error', 'Failed to retry invoice. Please try again.');
+    }
+  };
+
 
   return (
     <SafeAreaView style={styles.container}>
@@ -173,13 +200,13 @@ const DashboardScreen: React.FC = () => {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            <Text style={styles.greeting}>Good morning</Text>
-            <Text style={styles.userName}>{user?.businessName || 'User'}</Text>
+            <Text style={styles.greeting}>Welcome back</Text>
+            <Text style={styles.userName}>{user?.email || user?.businessName || 'User'}</Text>
           </View>
           <TouchableOpacity style={styles.profileButton}>
             <View style={styles.profileAvatar}>
               <Text style={styles.profileInitial}>
-                {(user?.businessName || 'U').charAt(0).toUpperCase()}
+                {(user?.email || user?.businessName || 'U').charAt(0).toUpperCase()}
               </Text>
             </View>
           </TouchableOpacity>
@@ -192,7 +219,10 @@ const DashboardScreen: React.FC = () => {
             KES {dashboardStats?.total_revenue ? Number(dashboardStats.total_revenue).toLocaleString() : '0.00'}
           </Text>
           <View style={styles.balanceActions}>
-            <TouchableOpacity style={styles.actionButton}>
+            <TouchableOpacity 
+              style={styles.actionButton}
+              onPress={() => (navigation as any).navigate('Invoices')}
+            >
               <Text style={styles.actionButtonText}>
                 {dashboardStats?.total_invoices || 0} Invoices
               </Text>
@@ -227,20 +257,16 @@ const DashboardScreen: React.FC = () => {
         </View>
         
         <View style={styles.statusContainer}>
-          <View style={styles.statusCard}>
-            <Text style={styles.statusLabel}>Failed Invoices</Text>
-            <Text style={[styles.statusValue, { color: getStatusColor('failed') }]}>
-              {dashboardStats?.failed_invoices || 0}
+          <TouchableOpacity 
+            style={styles.statusCard}
+            onPress={() => (navigation as any).navigate('Invoices')}
+          >
+            <Text style={styles.statusLabel}>Retry Queue</Text>
+            <Text style={[styles.statusValue, { color: getStatusColor('retry') }]}>
+              {retryQueueSize || 0}
             </Text>
-            {(dashboardStats?.failed_invoices || 0) > 0 && (
-              <TouchableOpacity onPress={handleRetryFailed} style={styles.retryButton}>
-                <Text style={styles.retryButtonText}>Retry All</Text>
-              </TouchableOpacity>
-            )}
-            {retryQueueSize > 0 && (
-              <Text style={styles.statusSubtext}>{retryQueueSize} in retry queue</Text>
-            )}
-          </View>
+            <Text style={styles.statusSubtext}>Invoices pending retry</Text>
+          </TouchableOpacity>
           
           <View style={styles.statusCard}>
             <Text style={styles.statusLabel}>Last Sync</Text>
@@ -285,49 +311,27 @@ const DashboardScreen: React.FC = () => {
           
           <TouchableOpacity 
             style={styles.quickActionCard}
-            onPress={() => (navigation as any).navigate('Settings')}
+            onPress={() => (navigation as any).navigate('SettingsTab')}
           >
             <Text style={styles.quickActionTitle}>Settings</Text>
             <Text style={styles.quickActionSubtitle}>Configuration</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Company Setup - Available to all users */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Company Setup</Text>
-        </View>
-        
-        <View style={styles.quickActionsContainer}>
-          <TouchableOpacity 
-            style={styles.quickActionCard}
-            onPress={() => (navigation as any).navigate('SettingsTab', { screen: 'CompanyRegistration' })}
-          >
-            <Text style={styles.quickActionTitle}>Register Company</Text>
-            <Text style={styles.quickActionSubtitle}>KRA eTIMS registration</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.quickActionCard}
-            onPress={() => (navigation as any).navigate('SettingsTab', { screen: 'DeviceSetup' })}
-          >
-            <Text style={styles.quickActionTitle}>Device Setup</Text>
-            <Text style={styles.quickActionSubtitle}>Configure OSCU/VSCU</Text>
-          </TouchableOpacity>
-        </View>
 
         {/* Recent Activity Header */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Recent Activity</Text>
-          <TouchableOpacity>
+          <Text style={styles.sectionTitle}>Failed Invoices</Text>
+          <TouchableOpacity onPress={() => (navigation as any).navigate('Invoices')}>
             <Text style={styles.viewAllText}>View all</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Transaction List */}
+        {/* Failed Invoices List */}
         <View style={styles.transactionList}>
           {recentInvoices.length > 0 ? (
             recentInvoices.map((invoice, index) => (
-              <TouchableOpacity key={invoice.id} style={styles.transactionItem}>
+              <View key={invoice.id} style={styles.transactionItem}>
                 <View style={styles.transactionIcon}>
                   <View style={[styles.iconCircle, { backgroundColor: getStatusColor(invoice.status) }]}>
                     <Text style={styles.iconText}>
@@ -351,12 +355,18 @@ const DashboardScreen: React.FC = () => {
                   {((invoice as any).receipt_no) && (
                     <Text style={styles.receiptText}>#{(invoice as any).receipt_no}</Text>
                   )}
+                  <TouchableOpacity 
+                    style={styles.invoiceRetryButton}
+                    onPress={() => handleRetryInvoice(invoice.id)}
+                  >
+                    <Text style={styles.invoiceRetryButtonText}>Retry</Text>
+                  </TouchableOpacity>
                 </View>
-              </TouchableOpacity>
+              </View>
             ))
           ) : (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>No recent invoices</Text>
+              <Text style={styles.emptyStateText}>No failed invoices</Text>
             </View>
           )}
         </View>
@@ -651,6 +661,18 @@ const styles = StyleSheet.create({
   retryButtonText: {
     color: colors.secondary,
     fontSize: 12,
+    fontWeight: '600',
+  },
+  invoiceRetryButton: {
+    marginTop: spacing.xs,
+    paddingVertical: spacing.xs / 2,
+    paddingHorizontal: spacing.sm,
+    backgroundColor: colors.primary,
+    borderRadius: 4,
+  },
+  invoiceRetryButtonText: {
+    color: colors.secondary,
+    fontSize: 11,
     fontWeight: '600',
   },
   // Legacy styles for compatibility

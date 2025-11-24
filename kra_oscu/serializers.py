@@ -169,6 +169,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
     """Serializer for Invoice model"""
     items = InvoiceItemSerializer(many=True)
     device_serial_number = serializers.CharField(write_only=True, help_text="Device serial number")
+    invoice_no = serializers.CharField(required=False, help_text="Auto-generated if not provided")
     
     class Meta:
         model = Invoice
@@ -245,6 +246,10 @@ class InvoiceSerializer(serializers.ModelSerializer):
         device = Device.objects.get(serial_number=device_serial, status='active')
         validated_data['device'] = device
         validated_data['company'] = device.company
+        
+        # Auto-generate invoice_no if not provided
+        if 'invoice_no' not in validated_data or not validated_data['invoice_no']:
+            validated_data['invoice_no'] = device.get_next_receipt_number()
         
         # Create invoice
         invoice = Invoice.objects.create(**validated_data)

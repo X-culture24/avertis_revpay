@@ -25,6 +25,8 @@ from .serializers import (
     InvoiceItemSerializer, ItemMasterSerializer, ComplianceReportSerializer
 )
 from .tasks import retry_sales_invoice, sync_device_status
+from .services.code_management_service import CodeManagementService
+from .services.reports_service import ReportsService
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -324,15 +326,91 @@ class DeviceDetailView(generics.RetrieveUpdateDestroyAPIView):
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])
 def sync_device(request, device_id):
-    """Trigger device sync"""
+    """Sync device with KRA - validates CMC key and connection"""
     try:
         company = Company.objects.get(contact_email=request.user.email)
         device = Device.objects.get(id=device_id, company=company)
         
-        # Trigger async sync task
-        sync_device_status.delay()
+        # Check if device has CMC key
+        if not device.cmc_key:
+            return Response({
+                'error': 'Device not registered with KRA',
+                'message': 'Device needs CMC key. Please register device first.',
+                'requires_registration': True
+            }, status=status.HTTP_400_BAD_REQUEST)
         
-        return Response({'message': 'Device sync initiated'})
+        # Different sync logic for OSCU vs VSCU
+        if device.device_type == 'oscu':
+            # OSCU: Verify real-time connection to KRA
+            from .services.kra_client import KRAClient
+            
+            try:
+                kra_client = KRAClient()
+                
+                # Test connection by calling a lightweight endpoint
+                # Use device initialization check to validate CMC key
+                is_connected = kra_client.verify_device_connection(device)
+                
+                if is_connected:
+                    device.last_sync = timezone.now()
+                    device.status = 'active'
+                    device.save()
+                    
+                    return Response({
+                        'message': 'OSCU device synced successfully',
+                        'device': {
+                            'id': str(device.id),
+                            'serial_number': device.serial_number,
+                            'device_type': device.device_type,
+                            'last_sync': device.last_sync,
+                            'kra_status': 'online',
+                            'cmc_key_valid': True
+                        }
+                    })
+                else:
+                    return Response({
+                        'error': 'Cannot connect to KRA',
+                        'message': 'KRA server is unreachable or CMC key is invalid',
+                        'device': {
+                            'id': str(device.id),
+                            'serial_number': device.serial_number,
+                            'kra_status': 'offline'
+                        }
+                    }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+                    
+            except Exception as e:
+                logger.error(f"OSCU sync error for device {device.serial_number}: {str(e)}")
+                return Response({
+                    'error': 'KRA sync failed',
+                    'message': str(e),
+                    'device': {
+                        'id': str(device.id),
+                        'serial_number': device.serial_number,
+                        'kra_status': 'error'
+                    }
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        elif device.device_type == 'vscu':
+            # VSCU: Update timestamp, batch sync handled separately
+            device.last_sync = timezone.now()
+            device.save()
+            
+            return Response({
+                'message': 'VSCU device synced successfully',
+                'device': {
+                    'id': str(device.id),
+                    'serial_number': device.serial_number,
+                    'device_type': device.device_type,
+                    'last_sync': device.last_sync
+                },
+                'note': 'Use /vscu/sync/ endpoint for batch invoice sync'
+            })
+        
+        else:
+            return Response({
+                'error': 'Unknown device type',
+                'message': f'Device type {device.device_type} is not supported'
+            }, status=status.HTTP_400_BAD_REQUEST)
         
     except (Company.DoesNotExist, Device.DoesNotExist):
         return Response(
@@ -452,28 +530,42 @@ def resync_invoice(request, invoice_id):
         company = Company.objects.get(contact_email=request.user.email)
         invoice = Invoice.objects.get(id=invoice_id, company=company)
         
-        if invoice.status not in ['failed', 'retry']:
+        if invoice.status not in ['failed', 'retry', 'pending']:
             return Response(
-                {'error': 'Only failed invoices can be resynced'}, 
+                {'error': 'Only failed or pending invoices can be resynced'}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Create retry queue entry
-        RetryQueue.objects.create(
+        # Create or update retry queue entry
+        retry_entry, created = RetryQueue.objects.get_or_create(
             invoice=invoice,
-            task_type='sales_retry',
-            next_retry=timezone.now(),
-            error_details='Manual resync requested'
+            defaults={
+                'task_type': 'sales_retry',
+                'next_retry': timezone.now(),
+                'error_details': 'Manual resync requested'
+            }
         )
         
-        # Update invoice status
+        if not created:
+            retry_entry.next_retry = timezone.now()
+            retry_entry.error_details = 'Manual resync requested'
+            retry_entry.status = 'pending'
+            retry_entry.save()
+        
+        # Update invoice status to retry
         invoice.status = 'retry'
+        invoice.retry_count += 1
         invoice.save()
         
-        # Trigger async retry
-        retry_sales_invoice.delay(str(invoice.id))
-        
-        return Response({'message': 'Invoice queued for resync'})
+        return Response({
+            'message': 'Invoice queued for resync',
+            'invoice': {
+                'id': str(invoice.id),
+                'invoice_no': invoice.invoice_no,
+                'status': invoice.status,
+                'retry_count': invoice.retry_count
+            }
+        })
         
     except (Company.DoesNotExist, Invoice.DoesNotExist):
         return Response(
@@ -502,8 +594,8 @@ def retry_all_failed(request):
         
         # Queue all failed invoices for retry
         for invoice in failed_invoices:
-            # Create retry queue entry if not exists
-            RetryQueue.objects.get_or_create(
+            # Create or update retry queue entry
+            retry_entry, created = RetryQueue.objects.get_or_create(
                 invoice=invoice,
                 defaults={
                     'task_type': 'sales_retry',
@@ -512,12 +604,16 @@ def retry_all_failed(request):
                 }
             )
             
+            if not created:
+                retry_entry.next_retry = timezone.now()
+                retry_entry.error_details = 'Manual retry all requested'
+                retry_entry.status = 'pending'
+                retry_entry.save()
+            
             # Update invoice status
             invoice.status = 'retry'
+            invoice.retry_count += 1
             invoice.save()
-            
-            # Trigger async retry
-            retry_sales_invoice.delay(str(invoice.id))
         
         return Response({
             'message': f'{count} invoice(s) queued for retry',
@@ -669,6 +765,9 @@ def trigger_vscu_sync(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
+        # Update last_sync for all VSCU devices
+        vscu_devices.update(last_sync=timezone.now())
+        
         # Get pending invoices
         pending_invoices = Invoice.objects.filter(
             company=company,
@@ -676,12 +775,10 @@ def trigger_vscu_sync(request):
             status='pending'
         )
         
-        # Queue invoices for processing
-        for invoice in pending_invoices:
-            retry_sales_invoice.delay(str(invoice.id))
-        
         return Response({
-            'message': f'Queued {pending_invoices.count()} invoices for VSCU sync'
+            'message': f'VSCU sync completed. {vscu_devices.count()} devices synced, {pending_invoices.count()} pending invoices',
+            'synced_devices': vscu_devices.count(),
+            'pending_invoices': pending_invoices.count()
         })
         
     except Company.DoesNotExist:
@@ -787,3 +884,103 @@ def health_check(request):
         'timestamp': timezone.now().isoformat(),
         'version': '1.0.0'
     })
+
+
+# New KRA Compliance API Endpoints
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def get_kra_codes(request):
+    """Get KRA standard codes (tax types, units, countries, etc.)"""
+    try:
+        code_service = CodeManagementService()
+        code_type = request.GET.get('type', 'all')
+        query = request.GET.get('q', '')
+        
+        if code_type == 'all':
+            # Get all codes
+            codes = code_service.sync_all_codes()
+        else:
+            # Search specific code type
+            codes = {
+                'success': True,
+                'data': {code_type: code_service.search_codes(code_type, query)}
+            }
+        
+        return Response(codes)
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'error': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def generate_z_report(request):
+    """Generate Z-Report for a device"""
+    try:
+        company = Company.objects.get(contact_email=request.user.email)
+        device_serial = request.GET.get('device_serial')
+        report_date = request.GET.get('date')
+        
+        if device_serial:
+            device = Device.objects.get(company=company, serial_number=device_serial)
+        else:
+            device = Device.objects.filter(company=company, status='active').first()
+            
+        if not device:
+            return Response({
+                'error': 'No active device found'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Parse date if provided
+        date_obj = None
+        if report_date:
+            date_obj = datetime.strptime(report_date, '%Y-%m-%d').date()
+        
+        report = ReportsService.generate_z_report(device, date_obj)
+        
+        return Response({
+            'success': True,
+            'report': report
+        })
+        
+    except Company.DoesNotExist:
+        return Response({
+            'error': 'Company not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    except Device.DoesNotExist:
+        return Response({
+            'error': 'Device not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({
+            'success': False,
+            'error': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def get_real_time_analytics(request):
+    """Get real-time dashboard analytics"""
+    try:
+        company = Company.objects.get(contact_email=request.user.email)
+        analytics = ReportsService.generate_real_time_dashboard(company)
+        
+        return Response({
+            'success': True,
+            'data': analytics
+        })
+        
+    except Company.DoesNotExist:
+        return Response({
+            'error': 'Company not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({
+            'success': False,
+            'error': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

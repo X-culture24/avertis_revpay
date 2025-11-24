@@ -3,11 +3,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ApiResponse, DashboardStats, Invoice, IntegrationSettings, ComplianceReport, User, AuthTokens } from '@/types';
 
 // Network configuration - use ngrok tunnel for external access
-const BASE_URL = __DEV__ ? 'https://5b47348c2dfb.ngrok-free.app' : 'https://your-production-api.com';
+const BASE_URL = __DEV__ ? 'https://2ec64400f7cf.ngrok-free.app' : 'https://your-production-api.com';
 
 // Single server configuration using ngrok tunnel
 const POSSIBLE_URLS = [
-  'https://5b47348c2dfb.ngrok-free.app', // ngrok tunnel for external access
+  'https://2ec64400f7cf.ngrok-free.app', // ngrok tunnel for external access
 ];
 
 class ApiService {

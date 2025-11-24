@@ -2,7 +2,7 @@
 	"info": {
 		"_postman_id": "revpay-mobile-api-2024",
 		"name": "Revpay Connect - Mobile API Collection",
-		"description": "Complete mobile API collection for React Native app integration with Django backend.\n\nThis collection includes:\n- JWT Authentication (login/refresh/logout)\n- Dashboard statistics and analytics\n- Invoice management and creation\n- Device management and synchronization\n- Company profile management\n- Compliance reporting\n- Health monitoring\n\nBase URL: https://056211fc8ef6.ngrok-free.app\nAuthentication: JWT Bearer Token",
+		"description": "Complete mobile API collection for React Native app integration with Django backend.\n\nThis collection includes:\n- JWT Authentication (login/refresh/logout)\n- Dashboard statistics and analytics\n- Invoice management and creation\n- Device management and synchronization\n- Company profile management\n- Compliance reporting\n- Health monitoring\n\nBase URL: https://2ec64400f7cf.ngrok-free.app\nAuthentication: JWT Bearer Token",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"item": [

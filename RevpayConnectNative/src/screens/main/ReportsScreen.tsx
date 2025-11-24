@@ -8,7 +8,11 @@ import {
   Alert,
   Dimensions,
   TouchableOpacity,
+  Platform,
 } from 'react-native';
+import Share from 'react-native-share';
+import RNFS from 'react-native-fs';
+import * as XLSX from 'xlsx';
 // Charts temporarily disabled due to dependency conflicts
 // // import { VictoryChart, VictoryLine, VictoryBar, VictoryArea, VictoryAxis, VictoryTheme } from 'victory-native';
 
@@ -63,117 +67,91 @@ const ReportsScreen: React.FC = () => {
     setRefreshing(false);
   };
 
-  const handleExportPDF = async () => {
-    try {
-      Alert.alert(
-        'Export PDF',
-        'Choose report type to export:',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Summary Report',
-            onPress: async () => {
-              try {
-                // TODO: Implement actual PDF generation
-                const reportData = {
-                  period: selectedPeriod,
-                  totalInvoices: currentMonth.totalInvoices,
-                  syncedInvoices: currentMonth.syncedInvoices,
-                  failedInvoices: currentMonth.failedInvoices,
-                  successRate: currentMonth.successRate,
-                  totalRevenue: currentMonth.totalRevenue,
-                  generatedAt: new Date().toISOString(),
-                };
-                
-                console.log('Generating PDF with data:', reportData);
-                Alert.alert('Success', 'PDF report has been generated and saved to your device');
-                // In production: Use react-native-pdf or similar library
-                // const pdfPath = await generatePDF(reportData);
-                // Share.open({ url: pdfPath });
-              } catch (error) {
-                Alert.alert('Error', 'Failed to generate PDF report');
-              }
-            },
-          },
-          {
-            text: 'Detailed Report',
-            onPress: async () => {
-              try {
-                // TODO: Fetch detailed invoice data and generate comprehensive PDF
-                Alert.alert('Success', 'Detailed PDF report has been generated');
-              } catch (error) {
-                Alert.alert('Error', 'Failed to generate detailed PDF');
-              }
-            },
-          },
-        ]
-      );
-    } catch (error) {
-      Alert.alert('Error', 'Failed to export PDF');
-    }
-  };
 
   const handleExportExcel = async () => {
     try {
-      Alert.alert(
-        'Export Excel',
-        'Choose data to export:',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Invoice Summary',
-            onPress: async () => {
-              try {
-                // TODO: Implement actual Excel generation
-                const excelData = {
-                  period: selectedPeriod,
-                  metrics: {
-                    totalInvoices: currentMonth.totalInvoices,
-                    syncedInvoices: currentMonth.syncedInvoices,
-                    failedInvoices: currentMonth.failedInvoices,
-                    successRate: currentMonth.successRate,
-                    totalRevenue: currentMonth.totalRevenue,
-                  },
-                  chartData: chartData,
-                  generatedAt: new Date().toISOString(),
-                };
-                
-                console.log('Generating Excel with data:', excelData);
-                Alert.alert('Success', 'Excel spreadsheet has been generated and saved to your device');
-                // In production: Use xlsx or similar library
-                // const excelPath = await generateExcel(excelData);
-                // Share.open({ url: excelPath });
-              } catch (error) {
-                Alert.alert('Error', 'Failed to generate Excel file');
-              }
-            },
-          },
-          {
-            text: 'All Invoices',
-            onPress: async () => {
-              try {
-                // TODO: Fetch all invoices and export to Excel
-                Alert.alert('Success', 'All invoices exported to Excel');
-              } catch (error) {
-                Alert.alert('Error', 'Failed to export invoices');
-              }
-            },
-          },
-          {
-            text: 'Compliance Report',
-            onPress: async () => {
-              try {
-                // TODO: Generate compliance-specific Excel report
-                Alert.alert('Success', 'Compliance report exported to Excel');
-              } catch (error) {
-                Alert.alert('Error', 'Failed to export compliance report');
-              }
-            },
-          },
-        ]
-      );
+      // Fetch all invoices
+      const invoicesResponse = await apiService.getInvoices(1, 1000);
+      const invoices = invoicesResponse.success && invoicesResponse.data 
+        ? ((invoicesResponse.data as any).results || []) 
+        : [];
+
+      const currentMonth = reports[0] || {
+        totalInvoices: 0,
+        syncedInvoices: 0,
+        failedInvoices: 0,
+        successRate: 0,
+        totalRevenue: 0,
+      };
+
+      // Create workbook
+      const wb = XLSX.utils.book_new();
+
+      // Summary Sheet
+      const summaryData = [
+        ['Revpay Connect eTIMS - Invoice Report'],
+        ['Generated:', new Date().toLocaleString()],
+        [],
+        ['Summary Statistics'],
+        ['Metric', 'Value'],
+        ['Total Invoices', currentMonth.totalInvoices],
+        ['Synced Invoices', currentMonth.syncedInvoices],
+        ['Failed Invoices', currentMonth.failedInvoices],
+        ['Success Rate', `${currentMonth.successRate}%`],
+        ['Total Revenue (KES)', Number(currentMonth.totalRevenue).toLocaleString()],
+      ];
+      const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
+      XLSX.utils.book_append_sheet(wb, summarySheet, 'Summary');
+
+      // Invoices Sheet
+      const invoiceData = invoices.map((inv: any) => ({
+        'Invoice No': inv.invoice_no || 'N/A',
+        'Customer Name': inv.customer_name || 'Unknown',
+        'Customer TIN': inv.customer_tin || 'N/A',
+        'Amount (KES)': Number(inv.total_amount || 0),
+        'Tax Amount (KES)': Number(inv.tax_amount || 0),
+        'Payment Type': inv.payment_type || 'N/A',
+        'Status': (inv.status || 'unknown').toUpperCase(),
+        'Receipt No': inv.receipt_no || 'Pending',
+        'Transaction Date': new Date(inv.transaction_date).toLocaleString(),
+        'Created At': new Date(inv.created_at).toLocaleString(),
+      }));
+      const invoiceSheet = XLSX.utils.json_to_sheet(invoiceData);
+      XLSX.utils.book_append_sheet(wb, invoiceSheet, 'Invoices');
+
+      // Failed Invoices Sheet
+      const failedInvoices = invoices.filter((inv: any) => inv.status === 'failed');
+      if (failedInvoices.length > 0) {
+        const failedData = failedInvoices.map((inv: any) => ({
+          'Invoice No': inv.invoice_no || 'N/A',
+          'Customer': inv.customer_name || 'Unknown',
+          'Amount (KES)': Number(inv.total_amount || 0),
+          'Retry Count': inv.retry_count || 0,
+          'Created At': new Date(inv.created_at).toLocaleString(),
+        }));
+        const failedSheet = XLSX.utils.json_to_sheet(failedData);
+        XLSX.utils.book_append_sheet(wb, failedSheet, 'Failed Invoices');
+      }
+
+      // Generate Excel file as binary
+      const wbout = XLSX.write(wb, { type: 'binary', bookType: 'xlsx' });
+      const fileName = `RevpayConnect_Report_${new Date().getTime()}.xlsx`;
+      const filePath = `${RNFS.DocumentDirectoryPath}/${fileName}`;
+
+      // Write to file
+      await RNFS.writeFile(filePath, wbout, 'ascii');
+
+      // Share the Excel file
+      await Share.open({
+        url: `file://${filePath}`,
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        title: 'Save Invoice Report',
+      });
+      
+      Alert.alert('Success', 'Excel report generated and ready to share!');
     } catch (error) {
-      Alert.alert('Error', 'Failed to export Excel');
+      console.error('Excel Export Error:', error);
+      Alert.alert('Error', 'Failed to export Excel: ' + (error as Error).message);
     }
   };
 
@@ -397,15 +375,8 @@ const ReportsScreen: React.FC = () => {
           
           <View style={styles.exportButtons}>
             <TouchableOpacity
-              onPress={handleExportPDF}
-              style={styles.exportButton}
-            >
-              <Text style={styles.exportButtonText}>📄 Export PDF</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
               onPress={handleExportExcel}
-              style={styles.exportButton}
+              style={[styles.exportButton, { flex: 1, marginHorizontal: 0 }]}
             >
               <Text style={styles.exportButtonText}>📊 Export Excel</Text>
             </TouchableOpacity>

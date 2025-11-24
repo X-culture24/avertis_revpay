@@ -22,8 +22,6 @@ import { Invoice, InvoiceItem } from '@/types';
 const CreateInvoiceScreen: React.FC = () => {
   const navigation = useNavigation();
   // const integrationSettings = useRecoilValue(integrationSettingsState);
-  
-  const navigation = useNavigation();
   const { user } = useRecoilValue(authState);
   
   const [loading, setLoading] = useState(false);

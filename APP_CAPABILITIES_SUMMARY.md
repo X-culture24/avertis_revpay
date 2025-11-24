@@ -8,7 +8,7 @@ Revpay Connect is a comprehensive mobile application for KRA eTIMS (Electronic T
 - **Language**: TypeScript for type safety
 - **State Management**: Recoil for global state
 - **Navigation**: React Navigation v6
-- **UI Components**: React Native Paper
+- **UI Components**: React Native 
 - **Charts**: Victory Native for analytics
 - **Storage**: AsyncStorage for local data
 - **API Communication**: Axios with JWT authentication
