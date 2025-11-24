@@ -26,6 +26,7 @@ const CreateInvoiceScreen: React.FC = () => {
   
   const [loading, setLoading] = useState(false);
   const [devices, setDevices] = useState<any[]>([]);
+  const [subscription, setSubscription] = useState<any>(null);
   const [invoiceData, setInvoiceData] = useState({
     customerName: '',
     customerPin: '',
@@ -33,20 +34,27 @@ const CreateInvoiceScreen: React.FC = () => {
     transactionType: 'sale' as 'sale' | 'refund',
   });
 
-  // Fetch user's devices on mount
+  // Fetch user's devices and subscription on mount
   React.useEffect(() => {
-    const fetchDevices = async () => {
+    const fetchData = async () => {
       try {
+        // Fetch devices
         const response = await apiService.getDevices();
         if (response.success && response.data) {
           const deviceData = (response.data as any).results || response.data;
           setDevices(Array.isArray(deviceData) ? deviceData : [deviceData]);
         }
+        
+        // Fetch subscription status
+        const subResponse = await apiService.get('/subscription/current/');
+        if (subResponse.success && subResponse.data) {
+          setSubscription(subResponse.data.subscription);
+        }
       } catch (error) {
-        console.error('Error fetching devices:', error);
+        console.error('Error fetching data:', error);
       }
     };
-    fetchDevices();
+    fetchData();
   }, []);
   
   const [items, setItems] = useState<Partial<InvoiceItem>[]>([
@@ -123,6 +131,46 @@ const CreateInvoiceScreen: React.FC = () => {
 
   const handleCreateInvoice = async () => {
     if (!validateForm()) return;
+
+    // Check subscription limits before creating invoice
+    try {
+      const limitCheck = await apiService.post('/subscription/check-limits/', {
+        action: 'create_invoice'
+      });
+      
+      if (!limitCheck.success || !limitCheck.data?.allowed) {
+        const reason = limitCheck.data?.reason || 'unknown';
+        const message = limitCheck.data?.message || 'Cannot create invoice';
+        
+        if (reason === 'subscription_expired') {
+          Alert.alert(
+            'Subscription Expired',
+            'Your subscription has expired. Please renew to continue creating invoices.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Renew', onPress: () => (navigation as any).navigate('SubscriptionTab') }
+            ]
+          );
+          return;
+        } else if (reason === 'invoice_limit_reached') {
+          Alert.alert(
+            'Invoice Limit Reached',
+            `${message}\n\nUpgrade your plan to create more invoices.`,
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Upgrade', onPress: () => (navigation as any).navigate('SubscriptionTab') }
+            ]
+          );
+          return;
+        } else {
+          Alert.alert('Error', message);
+          return;
+        }
+      }
+    } catch (error: any) {
+      console.error('Error checking subscription limits:', error);
+      // Continue anyway if limit check fails (don't block user)
+    }
 
     setLoading(true);
     try {

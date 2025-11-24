@@ -11,6 +11,8 @@ from . import views_integration
 from . import views_environment
 from . import api_views
 from . import mobile_api_views
+from . import subscription_views
+from . import notification_views
 
 # Web interface URL patterns
 web_urlpatterns = [
@@ -55,6 +57,27 @@ mobile_api_urlpatterns = [
     
     # Notifications
     path('notifications/', mobile_api_views.mobile_notifications, name='mobile-notifications'),
+    
+    # Subscription Management
+    path('subscription/plans/', subscription_views.get_subscription_plans, name='subscription-plans'),
+    path('subscription/current/', subscription_views.get_current_subscription, name='current-subscription'),
+    path('subscription/upgrade/', subscription_views.upgrade_subscription, name='upgrade-subscription'),
+    path('subscription/cancel/', subscription_views.cancel_subscription, name='cancel-subscription'),
+    path('subscription/billing-history/', subscription_views.get_billing_history, name='billing-history'),
+    path('subscription/check-limits/', subscription_views.check_subscription_limits, name='check-limits'),
+    
+    # Payment
+    path('payment/mpesa/initiate/', subscription_views.initiate_mpesa_payment, name='mpesa-initiate'),
+    path('payment/mpesa/callback/', subscription_views.mpesa_callback, name='mpesa-callback'),
+    
+    # Notifications Management
+    path('notifications/list/', notification_views.get_notifications, name='get-notifications'),
+    path('notifications/<uuid:notification_id>/read/', notification_views.mark_notification_read, name='mark-notification-read'),
+    path('notifications/mark-all-read/', notification_views.mark_all_notifications_read, name='mark-all-read'),
+    path('notifications/<uuid:notification_id>/delete/', notification_views.delete_notification, name='delete-notification'),
+    path('notifications/clear-all/', notification_views.clear_all_notifications, name='clear-notifications'),
+    path('notifications/settings/', notification_views.notification_settings, name='notification-settings'),
+    path('notifications/test/', notification_views.create_test_notification, name='test-notification'),
     
     # DigiTax callback
     path('callback/digitax/', mobile_api_views.digitax_callback, name='digitax-callback'),

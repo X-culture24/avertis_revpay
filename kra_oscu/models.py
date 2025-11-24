@@ -87,7 +87,59 @@ class Company(BaseModel):
     
     # Revpay Connect metadata
     onboarding_date = models.DateTimeField(auto_now_add=True)
-    subscription_plan = models.CharField(max_length=50, default='basic', help_text="Subscription plan")
+    
+    # Subscription management
+    SUBSCRIPTION_STATUS_CHOICES = [
+        ('trial', 'Free Trial'),
+        ('active', 'Active Subscription'),
+        ('expired', 'Expired'),
+        ('cancelled', 'Cancelled'),
+        ('suspended', 'Suspended'),
+    ]
+    
+    SUBSCRIPTION_PLAN_CHOICES = [
+        ('free', 'Free Plan'),
+        ('starter', 'Starter Plan'),
+        ('business', 'Business Plan'),
+        ('enterprise', 'Enterprise Plan'),
+    ]
+    
+    subscription_plan = models.CharField(
+        max_length=50,
+        choices=SUBSCRIPTION_PLAN_CHOICES,
+        default='free',
+        help_text="Current subscription plan"
+    )
+    subscription_status = models.CharField(
+        max_length=20,
+        choices=SUBSCRIPTION_STATUS_CHOICES,
+        default='trial',
+        help_text="Subscription status"
+    )
+    subscription_start_date = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Date when subscription started"
+    )
+    subscription_ends_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Date when subscription expires"
+    )
+    trial_ends_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Date when trial period ends"
+    )
+    last_payment_date = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Date of last successful payment"
+    )
+    auto_renew = models.BooleanField(
+        default=True,
+        help_text="Automatically renew subscription"
+    )
     
     class Meta:
         db_table = 'revpay_companies'

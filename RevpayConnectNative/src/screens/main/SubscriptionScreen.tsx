@@ -9,7 +9,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { colors } from '@/theme/theme';
-// import apiService from '@/services/api'; // TODO: Implement API integration
+import { apiService } from '@/services/api';
 
 interface SubscriptionPlan {
   id: string;
@@ -126,11 +126,21 @@ const SubscriptionScreen: React.FC = () => {
 
   const loadSubscriptionData = async () => {
     try {
-      // TODO: Load from API
-      // const response = await apiService.getSubscription();
-      // setCurrentSubscription(response.data);
+      const response = await apiService.get('/subscription/current/');
+      const sub = response.data.subscription;
+      
+      setCurrentSubscription({
+        plan: sub.plan_name,
+        status: sub.status,
+        startDate: sub.start_date,
+        endDate: sub.end_date,
+        autoRenew: sub.auto_renew,
+        invoicesUsed: sub.invoices_used,
+        invoicesLimit: sub.invoices_limit === -1 ? 'unlimited' : sub.invoices_limit,
+      });
     } catch (error) {
       console.error('Error loading subscription:', error);
+      Alert.alert('Error', 'Failed to load subscription data');
     }
   };
 
@@ -146,21 +156,79 @@ const SubscriptionScreen: React.FC = () => {
 
     Alert.alert(
       'Upgrade Subscription',
-      `Upgrade to ${plan.name} plan for ${plan.currency} ${plan.price}/${plan.interval}?`,
+      `Upgrade to ${plan.name} plan for ${plan.currency} ${plan.price.toLocaleString()}/${plan.interval}?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Upgrade',
+          text: 'Continue',
           onPress: async () => {
             try {
-              // TODO: Call API to upgrade subscription
-              Alert.alert('Success', 'Subscription upgraded successfully');
-            } catch (error) {
-              Alert.alert('Error', 'Failed to upgrade subscription');
+              const response = await apiService.post('/subscription/upgrade/', { plan: planId });
+              
+              if (response.data.payment_required) {
+                // Navigate to payment screen or show payment modal
+                Alert.alert(
+                  'Payment Required',
+                  `Amount: ${response.data.currency} ${response.data.amount}\n\nPayment methods: M-Pesa, Card, Bank Transfer`,
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Pay with M-Pesa',
+                      onPress: () => handleMpesaPayment(response.data.amount, planId),
+                    },
+                  ]
+                );
+              } else {
+                Alert.alert('Success', response.data.message);
+                loadSubscriptionData();
+              }
+            } catch (error: any) {
+              Alert.alert('Error', error.response?.data?.error || 'Failed to upgrade subscription');
             }
           },
         },
       ]
+    );
+  };
+
+  const handleMpesaPayment = (amount: number, plan: string) => {
+    Alert.prompt(
+      'M-Pesa Payment',
+      'Enter your M-Pesa phone number (07XXXXXXXX or 2547XXXXXXXX)',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Send',
+          onPress: async (phoneNumber) => {
+            if (!phoneNumber) return;
+            
+            try {
+              const response = await apiService.post('/payment/mpesa/initiate/', {
+                amount,
+                phone_number: phoneNumber,
+                plan,
+              });
+              
+              Alert.alert(
+                'Payment Initiated',
+                'Please check your phone for the M-Pesa prompt and enter your PIN to complete the payment.',
+                [
+                  {
+                    text: 'OK',
+                    onPress: () => {
+                      // Poll for payment status or wait for webhook
+                      setTimeout(() => loadSubscriptionData(), 5000);
+                    },
+                  },
+                ]
+              );
+            } catch (error: any) {
+              Alert.alert('Error', error.response?.data?.error || 'Failed to initiate payment');
+            }
+          },
+        },
+      ],
+      'plain-text'
     );
   };
 
@@ -175,10 +243,11 @@ const SubscriptionScreen: React.FC = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              // TODO: Call API to cancel subscription
-              Alert.alert('Cancelled', 'Your subscription will end on ' + currentSubscription.endDate);
-            } catch (error) {
-              Alert.alert('Error', 'Failed to cancel subscription');
+              const response = await apiService.post('/subscription/cancel/');
+              Alert.alert('Cancelled', response.data.message);
+              loadSubscriptionData();
+            } catch (error: any) {
+              Alert.alert('Error', error.response?.data?.error || 'Failed to cancel subscription');
             }
           },
         },
@@ -187,8 +256,15 @@ const SubscriptionScreen: React.FC = () => {
   };
 
   const handleManagePayment = () => {
-    Alert.alert('Manage Payment', 'Payment management coming soon');
-    // TODO: Navigate to payment management screen
+    Alert.alert(
+      'Payment Methods',
+      'Choose your payment method',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'M-Pesa', onPress: () => Alert.alert('M-Pesa', 'M-Pesa payment setup coming soon') },
+        { text: 'Card', onPress: () => Alert.alert('Card', 'Card payment setup coming soon') },
+      ]
+    );
   };
 
   const getStatusColor = (status: string) => {

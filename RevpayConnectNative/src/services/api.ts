@@ -111,6 +111,23 @@ class ApiService {
     }
   }
 
+  // Convenience HTTP methods
+  async get<T = any>(endpoint: string, params?: any): Promise<ApiResponse<T>> {
+    return this.request<T>('GET', endpoint, params);
+  }
+
+  async post<T = any>(endpoint: string, data?: any): Promise<ApiResponse<T>> {
+    return this.request<T>('POST', endpoint, data);
+  }
+
+  async put<T = any>(endpoint: string, data?: any): Promise<ApiResponse<T>> {
+    return this.request<T>('PUT', endpoint, data);
+  }
+
+  async delete<T = any>(endpoint: string): Promise<ApiResponse<T>> {
+    return this.request<T>('DELETE', endpoint);
+  }
+
   // Authentication
   async login(credentials: { email: string; password: string }) {
     // Backend expects 'username' field, not 'email'

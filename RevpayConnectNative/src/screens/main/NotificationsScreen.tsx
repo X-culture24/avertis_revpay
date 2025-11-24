@@ -10,7 +10,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { colors } from '@/theme/theme';
-// import apiService from '@/services/api'; // TODO: Implement API integration
+import { apiService } from '@/services/api';
 
 interface Notification {
   id: string;
@@ -38,55 +38,23 @@ const NotificationsScreen: React.FC = () => {
 
   const loadNotifications = async () => {
     try {
-      // Mock data - replace with actual API call
-      const mockNotifications: Notification[] = [
-        {
-          id: '1',
-          title: 'Invoice Synced Successfully',
-          message: 'Invoice #INV-2024-001 has been synced to KRA eTIMS',
-          type: 'invoice',
-          timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-          read: false,
-          priority: 'high',
-        },
-        {
-          id: '2',
-          title: 'Device Sync Completed',
-          message: 'VSCU device synchronization completed successfully',
-          type: 'sync',
-          timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-          read: false,
-          priority: 'medium',
-        },
-        {
-          id: '3',
-          title: 'Compliance Report Ready',
-          message: 'Monthly compliance report for October 2024 is ready',
-          type: 'compliance',
-          timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-          read: true,
-          priority: 'medium',
-        },
-        {
-          id: '4',
-          title: 'System Update Available',
-          message: 'A new version of the app is available. Update now for latest features.',
-          type: 'system',
-          timestamp: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(),
-          read: true,
-          priority: 'low',
-        },
-      ];
-      setNotifications(mockNotifications);
+      const response = await apiService.get('/notifications/list/');
+      setNotifications(response.data.notifications);
     } catch (error) {
       console.error('Error loading notifications:', error);
+      Alert.alert('Error', 'Failed to load notifications');
     }
   };
 
   const loadNotificationSettings = async () => {
     try {
-      // Load settings from AsyncStorage or API
-      // For now using default values
+      const response = await apiService.get('/notifications/settings/');
+      const settings = response.data.settings;
+      setPushEnabled(settings.push_enabled);
+      setEmailEnabled(settings.email_enabled);
+      setInvoiceNotifs(settings.invoice_notifications);
+      setSyncNotifs(settings.sync_notifications);
+      setComplianceNotifs(settings.compliance_notifications);
     } catch (error) {
       console.error('Error loading notification settings:', error);
     }
@@ -99,17 +67,26 @@ const NotificationsScreen: React.FC = () => {
   };
 
   const markAsRead = async (notificationId: string) => {
-    setNotifications(prev =>
-      prev.map(notif =>
-        notif.id === notificationId ? { ...notif, read: true } : notif
-      )
-    );
-    // TODO: Call API to mark as read
+    try {
+      await apiService.post(`/notifications/${notificationId}/read/`);
+      setNotifications(prev =>
+        prev.map(notif =>
+          notif.id === notificationId ? { ...notif, read: true } : notif
+        )
+      );
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
   };
 
   const markAllAsRead = async () => {
-    setNotifications(prev => prev.map(notif => ({ ...notif, read: true })));
-    // TODO: Call API to mark all as read
+    try {
+      await apiService.post('/notifications/mark-all-read/');
+      setNotifications(prev => prev.map(notif => ({ ...notif, read: true })));
+    } catch (error) {
+      console.error('Error marking all as read:', error);
+      Alert.alert('Error', 'Failed to mark all as read');
+    }
   };
 
   const deleteNotification = async (notificationId: string) => {
@@ -121,9 +98,14 @@ const NotificationsScreen: React.FC = () => {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => {
-            setNotifications(prev => prev.filter(n => n.id !== notificationId));
-            // TODO: Call API to delete notification
+          onPress: async () => {
+            try {
+              await apiService.delete(`/notifications/${notificationId}/delete/`);
+              setNotifications(prev => prev.filter(n => n.id !== notificationId));
+            } catch (error) {
+              console.error('Error deleting notification:', error);
+              Alert.alert('Error', 'Failed to delete notification');
+            }
           },
         },
       ]
@@ -139,9 +121,14 @@ const NotificationsScreen: React.FC = () => {
         {
           text: 'Clear All',
           style: 'destructive',
-          onPress: () => {
-            setNotifications([]);
-            // TODO: Call API to clear all notifications
+          onPress: async () => {
+            try {
+              await apiService.delete('/notifications/clear-all/');
+              setNotifications([]);
+            } catch (error) {
+              console.error('Error clearing notifications:', error);
+              Alert.alert('Error', 'Failed to clear notifications');
+            }
           },
         },
       ]

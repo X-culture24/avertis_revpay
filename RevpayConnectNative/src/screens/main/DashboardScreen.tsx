@@ -30,6 +30,7 @@ const DashboardScreen: React.FC = () => {
   const [devices, setDevices] = useState<any[]>([]);
   const [retryQueueSize, setRetryQueueSize] = useState(0);
   const [lastSync, setLastSync] = useState<string | null>(null);
+  const [subscription, setSubscription] = useState<any>(null);
 
   const fetchDashboardData = async () => {
     try {
@@ -72,6 +73,17 @@ const DashboardScreen: React.FC = () => {
         }
       } catch (vscuError) {
         console.log('ℹ️ VSCU status not available (normal for OSCU-only setups)');
+      }
+      
+      // Fetch subscription status
+      try {
+        const subResponse = await apiService.get('/subscription/current/');
+        if (subResponse.success && subResponse.data) {
+          console.log('💳 Subscription received:', subResponse.data);
+          setSubscription(subResponse.data.subscription);
+        }
+      } catch (subError) {
+        console.log('ℹ️ Subscription info not available');
       }
       
     } catch (error) {
@@ -234,6 +246,60 @@ const DashboardScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
         </View>
+        
+        {/* Subscription Status Widget */}
+        {subscription && (
+          <TouchableOpacity 
+            style={[
+              styles.subscriptionCard,
+              subscription.is_trial && styles.subscriptionCardTrial,
+              subscription.status === 'expired' && styles.subscriptionCardExpired
+            ]}
+            onPress={() => (navigation as any).navigate('SubscriptionTab')}
+          >
+            <View style={styles.subscriptionHeader}>
+              <View>
+                <Text style={styles.subscriptionPlan}>{subscription.plan_name}</Text>
+                <Text style={[
+                  styles.subscriptionStatus,
+                  { color: subscription.status === 'active' ? '#34C759' : subscription.status === 'trial' ? '#FF9500' : '#FF3B30' }
+                ]}>
+                  {subscription.status.toUpperCase()}
+                  {subscription.is_trial && ` • ${subscription.trial_days_left} days left`}
+                </Text>
+              </View>
+              <Text style={styles.subscriptionPrice}>
+                {subscription.price === 0 ? 'FREE' : `${subscription.currency} ${subscription.price.toLocaleString()}`}
+              </Text>
+            </View>
+            
+            {subscription.invoices_limit !== -1 && (
+              <View style={styles.subscriptionUsage}>
+                <View style={styles.usageBar}>
+                  <View style={[
+                    styles.usageBarFill,
+                    { width: `${Math.min((subscription.invoices_used / subscription.invoices_limit) * 100, 100)}%` }
+                  ]} />
+                </View>
+                <Text style={styles.usageText}>
+                  {subscription.invoices_used} / {subscription.invoices_limit} invoices used this month
+                </Text>
+              </View>
+            )}
+            
+            {subscription.is_trial && subscription.trial_days_left <= 3 && (
+              <View style={styles.subscriptionWarning}>
+                <Text style={styles.warningText}>⚠️ Trial ending soon. Upgrade to continue using all features.</Text>
+              </View>
+            )}
+            
+            {subscription.status === 'expired' && (
+              <View style={styles.subscriptionExpired}>
+                <Text style={styles.expiredText}>❌ Subscription expired. Renew to continue.</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        )}
         
         {/* System Status Cards */}
         <View style={styles.statusContainer}>
@@ -631,6 +697,95 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.secondary,
     fontWeight: '600',
+  },
+  // Subscription Widget Styles
+  subscriptionCard: {
+    backgroundColor: colors.card,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.lg,
+    borderRadius: 16,
+    padding: spacing.lg,
+    borderWidth: 2,
+    borderColor: colors.border,
+    elevation: 3,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  subscriptionCardTrial: {
+    borderColor: '#FF9500',
+    backgroundColor: '#FFF8E1',
+  },
+  subscriptionCardExpired: {
+    borderColor: '#FF3B30',
+    backgroundColor: '#FFE5E5',
+  },
+  subscriptionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: spacing.md,
+  },
+  subscriptionPlan: {
+    ...typography.h2,
+    color: colors.text,
+    fontWeight: '700',
+    marginBottom: spacing.xs / 2,
+  },
+  subscriptionStatus: {
+    ...typography.caption,
+    fontWeight: '600',
+  },
+  subscriptionPrice: {
+    ...typography.h3,
+    color: colors.primary,
+    fontWeight: '700',
+  },
+  subscriptionUsage: {
+    marginTop: spacing.sm,
+  },
+  usageBar: {
+    height: 8,
+    backgroundColor: colors.divider,
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginBottom: spacing.xs,
+  },
+  usageBarFill: {
+    height: '100%',
+    backgroundColor: colors.primary,
+    borderRadius: 4,
+  },
+  usageText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+  },
+  subscriptionWarning: {
+    marginTop: spacing.sm,
+    padding: spacing.sm,
+    backgroundColor: '#FFF3CD',
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#FF9500',
+  },
+  warningText: {
+    ...typography.caption,
+    color: '#856404',
+    fontWeight: '500',
+  },
+  subscriptionExpired: {
+    marginTop: spacing.sm,
+    padding: spacing.sm,
+    backgroundColor: '#F8D7DA',
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#FF3B30',
+  },
+  expiredText: {
+    ...typography.caption,
+    color: '#721C24',
+    fontWeight: '500',
   },
   statusBadge: {
     paddingHorizontal: spacing.sm,
