@@ -10,6 +10,11 @@ export interface User {
   totalInvoices?: number;
   monthlyInvoices?: number;
   successRate?: number;
+  full_name?: string;
+  first_name?: string;
+  name?: string;
+  username?: string;
+  company_name?: string;
 }
 
 export interface AuthTokens {
@@ -35,13 +40,19 @@ export interface Invoice {
   customerName: string;
   customerPin?: string;
   items: InvoiceItem[];
-  status: 'PENDING' | 'SUBMITTED' | 'FAILED' | 'SYNCED';
+  status: 'PENDING' | 'SUBMITTED' | 'FAILED' | 'SYNCED' | 'confirmed';
   integrationMode: 'OSCU' | 'VSCU';
   jsonPayload?: string;
   submissionResponse?: string;
   createdAt: string;
   updatedAt: string;
   retryCount?: number;
+  receiptNo?: string;
+  receiptSignature?: string;
+  internalData?: string;
+  qrCodeData?: string;
+  receiptType?: string;
+  transactionType?: string;
 }
 
 export interface InvoiceItem {
@@ -94,9 +105,11 @@ export interface DashboardStats {
 }
 
 export type RootStackParamList = {
+  BrandedSplash: undefined;
+  Splash: undefined;
+  Welcome: undefined;
   Auth: undefined;
   Main: undefined;
-  Welcome: undefined;
   Login: undefined;
   Register: undefined;
   Dashboard: undefined;

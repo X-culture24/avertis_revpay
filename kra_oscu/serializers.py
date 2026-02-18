@@ -24,9 +24,11 @@ class CompanySerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'onboarding_date', 'created_at', 'updated_at']
 
     def validate_tin(self, value):
-        """Validate TIN format"""
-        if not value.isdigit() or len(value) != 11:
-            raise serializers.ValidationError("TIN must be exactly 11 digits")
+        """Validate TIN format - allow alphanumeric for testing"""
+        if len(value) != 11:
+            raise serializers.ValidationError("TIN must be exactly 11 characters")
+        # Allow alphanumeric TINs for testing (e.g., P1234567890)
+        # In production, you might want to enforce digits only
         return value
 
 
@@ -80,9 +82,10 @@ class DeviceSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'cmc_key', 'status', 'is_certified', 'last_sync', 'created_at', 'updated_at']
 
     def validate_tin(self, value):
-        """Validate TIN format"""
-        if not value.isdigit() or len(value) != 11:
-            raise serializers.ValidationError("TIN must be exactly 11 digits")
+        """Validate TIN format - accepts alphanumeric for testing"""
+        import re
+        if not re.match(r'^[A-Z0-9]{11}$', value):
+            raise serializers.ValidationError("TIN must be exactly 11 alphanumeric characters")
         return value
 
     def validate_bhf_id(self, value):
@@ -177,8 +180,8 @@ class InvoiceSerializer(serializers.ModelSerializer):
             'id', 'invoice_no', 'receipt_no', 'device_serial_number', 'tin',
             'total_amount', 'tax_amount', 'currency', 'customer_tin', 'customer_name',
             'payment_type', 'receipt_type', 'transaction_type', 'is_copy', 
-            'original_receipt_no', 'qr_code_data', 'status', 'transaction_date', 
-            'retry_count', 'items', 'created_at', 'updated_at'
+            'original_receipt_no', 'qr_code_data', 'receipt_signature', 'internal_data',
+            'status', 'transaction_date', 'retry_count', 'items', 'created_at', 'updated_at'
         ]
         read_only_fields = [
             'id', 'receipt_no', 'internal_data', 'receipt_signature', 

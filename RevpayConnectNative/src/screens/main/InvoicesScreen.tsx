@@ -12,6 +12,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '@/types';
 import { useRecoilState } from 'recoil';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { colors, spacing, typography } from '@/theme/theme';
 import { invoicesState } from '@/store/atoms';
@@ -172,7 +173,8 @@ const InvoicesScreen: React.FC = () => {
           style={styles.createButton}
           onPress={() => navigation.navigate('CreateInvoice')}
         >
-          <Text style={styles.createButtonText}>📝 Create Invoice</Text>
+          <Icon name="plus-circle" size={20} color={colors.background} style={{ marginRight: spacing.sm }} />
+          <Text style={styles.createButtonText}>Create Invoice</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -186,7 +188,7 @@ const InvoicesScreen: React.FC = () => {
         
         {/* Search - Custom TextInput to replace Searchbar */}
         <View style={styles.searchContainer}>
-          <Text style={styles.searchIcon}>🔍</Text>
+          <Icon name="magnify" size={20} color="#000000" style={{ marginRight: spacing.sm }} />
           <TextInput
             placeholder="Search invoices..."
             onChangeText={setSearchQuery}
@@ -194,6 +196,11 @@ const InvoicesScreen: React.FC = () => {
             style={styles.searchInput}
             placeholderTextColor={colors.textSecondary}
           />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <Icon name="close-circle" size={20} color="#000000" />
+            </TouchableOpacity>
+          )}
         </View>
         
         {/* Status Filters */}
@@ -240,7 +247,8 @@ const InvoicesScreen: React.FC = () => {
         style={styles.createButton}
         onPress={() => (navigation as any).navigate('CreateInvoice')}
       >
-        <Text style={styles.createButtonText}>📝 Create Invoice</Text>
+        <Icon name="plus-circle" size={20} color={colors.background} style={{ marginRight: spacing.sm }} />
+        <Text style={styles.createButtonText}>Create Invoice</Text>
       </TouchableOpacity>
     </View>
   );
@@ -269,11 +277,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     borderWidth: 1,
     borderColor: colors.border,
-  },
-  searchIcon: {
-    fontSize: 16,
-    marginRight: spacing.sm,
-    color: colors.textSecondary,
   },
   searchInput: {
     flex: 1,
@@ -406,6 +409,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
+    flexDirection: 'row',
   },
   createButtonText: {
     color: colors.background,

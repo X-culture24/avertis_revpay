@@ -1,4 +1,5 @@
 const {getDefaultConfig, mergeConfig} = require('@react-native/metro-config');
+const path = require('path');
 
 /**
  * Metro configuration
@@ -18,6 +19,12 @@ const config = {
       '@utils': './src/utils',
       '@theme': './src/theme',
     },
+    // Force axios to use browser build
+    resolverMainFields: ['react-native', 'browser', 'module', 'main'],
+    // Blacklist Node.js specific axios files
+    blockList: [
+      /node_modules\/axios\/dist\/node\/.*/,
+    ],
   },
 };
 

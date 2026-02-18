@@ -201,6 +201,8 @@ KRA_SANDBOX_BASE_URL = config('KRA_SANDBOX_BASE_URL', default='https://etims-api
 KRA_PROD_BASE_URL = config('KRA_PROD_BASE_URL', default='https://etims-api.kra.go.ke')
 KRA_TIMEOUT = config('KRA_TIMEOUT', default=30, cast=int)
 KRA_ENVIRONMENT = config('KRA_ENVIRONMENT', default='sandbox')
+KRA_USE_MOCK = config('KRA_USE_MOCK', default=True, cast=bool)  # Use mock responses for testing
+KRA_API_KEY = config('KRA_API_KEY', default='')
 
 # Logging
 # Authentication settings

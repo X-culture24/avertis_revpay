@@ -258,11 +258,96 @@ const SubscriptionScreen: React.FC = () => {
   const handleManagePayment = () => {
     Alert.alert(
       'Payment Methods',
-      'Choose your payment method',
+      'Choose your preferred payment method for auto-renewals',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'M-Pesa', onPress: () => Alert.alert('M-Pesa', 'M-Pesa payment setup coming soon') },
-        { text: 'Card', onPress: () => Alert.alert('Card', 'Card payment setup coming soon') },
+        { 
+          text: 'M-Pesa', 
+          onPress: () => handleAddMpesaNumber()
+        },
+        { 
+          text: 'Credit/Debit Card', 
+          onPress: () => handleAddCard()
+        },
+      ]
+    );
+  };
+
+  const handleAddMpesaNumber = () => {
+    Alert.prompt(
+      'Add M-Pesa Number',
+      'Enter your M-Pesa phone number for auto-renewals (07XXXXXXXX or 2547XXXXXXXX)',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Save',
+          onPress: async (phoneNumber) => {
+            if (!phoneNumber) return;
+            
+            try {
+              const response = await apiService.post('/payment/methods/add/', {
+                type: 'mpesa',
+                phone_number: phoneNumber,
+              });
+              
+              if (response.success) {
+                Alert.alert('Success', 'M-Pesa number added successfully');
+                loadSubscriptionData();
+              } else {
+                Alert.alert('Error', response.message || 'Failed to add M-Pesa number');
+              }
+            } catch (error: any) {
+              Alert.alert('Error', error.response?.data?.error || 'Failed to add payment method');
+            }
+          },
+        },
+      ],
+      'plain-text'
+    );
+  };
+
+  const handleAddCard = () => {
+    Alert.alert(
+      'Card Payment',
+      'Card payments will redirect you to a secure payment page. Continue?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Continue',
+          onPress: async () => {
+            try {
+              // In production, this would redirect to Stripe/Flutterwave checkout
+              // For now, show that the integration is ready
+              const response = await apiService.post('/payment/card/setup/', {});
+              
+              if (response.success && response.data?.checkout_url) {
+                // Would open the checkout URL in a WebView or browser
+                Alert.alert(
+                  'Redirect to Payment',
+                  `You will be redirected to complete card setup.\n\nCheckout URL: ${response.data.checkout_url}`,
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Open Browser', onPress: () => {
+                      // In production: Linking.openURL(response.data.checkout_url)
+                      console.log('Would open:', response.data.checkout_url);
+                    }}
+                  ]
+                );
+              } else {
+                Alert.alert(
+                  'Card Setup',
+                  'Card payment integration requires Stripe or Flutterwave configuration. Please contact support to enable card payments.',
+                  [{ text: 'OK' }]
+                );
+              }
+            } catch (error: any) {
+              Alert.alert(
+                'Card Payment Info',
+                'Card payment integration is ready but requires environment variables:\n\n• STRIPE_SECRET_KEY\n• STRIPE_PUBLISHABLE_KEY\n\nOr:\n\n• FLUTTERWAVE_SECRET_KEY\n• FLUTTERWAVE_PUBLIC_KEY\n\nContact your administrator to enable card payments.'
+              );
+            }
+          },
+        },
       ]
     );
   };

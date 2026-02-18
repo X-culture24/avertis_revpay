@@ -4,6 +4,9 @@ import { useRecoilValue } from 'recoil';
 
 import AuthNavigator from './AuthNavigator';
 import MainNavigator from './MainNavigator';
+import BrandedSplashScreen from '@/screens/onboarding/BrandedSplashScreen';
+import SplashScreen from '@/screens/onboarding/SplashScreen';
+import WelcomeScreen from '@/screens/onboarding/WelcomeScreen';
 import { authState } from '@/store/atoms';
 import { RootStackParamList } from '@/types';
 
@@ -13,7 +16,18 @@ const AppNavigator: React.FC = () => {
   const { isAuthenticated } = useRecoilValue(authState);
 
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator 
+      initialRouteName="BrandedSplash"
+      screenOptions={{ headerShown: false }}
+    >
+      {/* Branded Splash - First screen */}
+      <Stack.Screen name="BrandedSplash" component={BrandedSplashScreen} />
+      
+      {/* Onboarding Screens - Always available */}
+      <Stack.Screen name="Splash" component={SplashScreen} />
+      <Stack.Screen name="Welcome" component={WelcomeScreen} />
+      
+      {/* Auth and Main Stacks */}
       {isAuthenticated ? (
         <Stack.Screen name="Main" component={MainNavigator} />
       ) : (

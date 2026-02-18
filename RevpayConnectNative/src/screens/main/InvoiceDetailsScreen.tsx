@@ -7,7 +7,10 @@ import {
   Alert,
   TouchableOpacity,
   Image,
+  ActivityIndicator,
+  Share,
 } from 'react-native';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 // Using native React Native components instead of react-native-paper
 import { useRoute, useNavigation } from '@react-navigation/native';
 
@@ -23,6 +26,7 @@ const InvoiceDetailsScreen: React.FC = () => {
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [loading, setLoading] = useState(true);
   const [resyncing, setResyncing] = useState(false);
+  const [exportingPDF, setExportingPDF] = useState(false);
 
   const fetchInvoiceDetails = async () => {
     try {
@@ -51,6 +55,8 @@ const InvoiceDetailsScreen: React.FC = () => {
           transactionType: invoiceData.transaction_type || invoiceData.transactionType || 'sale',
           qrCodeData: invoiceData.qr_code_data || invoiceData.qrCodeData || null,
           receiptNo: invoiceData.receipt_no || invoiceData.receiptNo || null,
+          receiptSignature: invoiceData.receipt_signature || invoiceData.receiptSignature || null,
+          internalData: invoiceData.internal_data || invoiceData.internalData || null,
           items: (invoiceData.items || []).map((item: any) => ({
             ...item,
             description: item.description || item.item_description || 'No description',
@@ -90,6 +96,42 @@ const InvoiceDetailsScreen: React.FC = () => {
       Alert.alert('Error', 'Network error. Please try again.');
     } finally {
       setResyncing(false);
+    }
+  };
+
+  const handleExportPDF = async () => {
+    if (!invoice || !invoice.id) return;
+    
+    setExportingPDF(true);
+    try {
+      // Call backend to generate PDF
+      const response = await apiService.get(`/receipts/${invoice.id}/pdf/`);
+      
+      if (response.success && response.data) {
+        // PDF URL or base64 data
+        const pdfData = response.data as any;
+        
+        if (pdfData.pdf_url) {
+          // Share the PDF URL
+          await Share.share({
+            message: `Invoice ${invoice.invoiceNumber} PDF`,
+            url: pdfData.pdf_url,
+            title: `Invoice ${invoice.invoiceNumber}`,
+          });
+        } else if (pdfData.pdf_base64) {
+          // Handle base64 PDF data
+          Alert.alert('Success', 'PDF generated successfully');
+        } else {
+          Alert.alert('Success', 'PDF export initiated');
+        }
+      } else {
+        Alert.alert('Error', response.message || 'Failed to export PDF');
+      }
+    } catch (error) {
+      console.error('PDF export error:', error);
+      Alert.alert('Error', 'Failed to export PDF. Please try again.');
+    } finally {
+      setExportingPDF(false);
     }
   };
 
@@ -238,14 +280,102 @@ const InvoiceDetailsScreen: React.FC = () => {
         </View>
       </View>
 
-      {/* QR Code Section */}
-      {invoice.qrCodeData ? (
+      {/* KRA Approval Section - QR Code and Digital Signature */}
+      {(invoice.status === 'confirmed' || invoice.status === 'SYNCED' || invoice.receiptNo) && (
+        <View style={styles.card}>
+          <View style={styles.cardContent}>
+            <View style={styles.approvalHeader}>
+              <Icon name="check-decagram" size={24} color="#34C759" />
+              <Text style={styles.approvalTitle}>KRA Approved</Text>
+            </View>
+            
+            {invoice.receiptNo && (
+              <View style={styles.receiptNoContainer}>
+                <Text style={styles.receiptNoLabel}>KRA Receipt Number</Text>
+                <Text style={styles.receiptNoValue}>{invoice.receiptNo}</Text>
+              </View>
+            )}
+
+            {/* QR Code */}
+            {invoice.qrCodeData && (
+              <View style={styles.qrSection}>
+                <Text style={styles.qrTitle}>Verification QR Code</Text>
+                <View style={styles.qrContainer}>
+                  <Image
+                    source={{ 
+                      uri: invoice.qrCodeData.startsWith('data:') 
+                        ? invoice.qrCodeData 
+                        : `data:image/png;base64,${invoice.qrCodeData}` 
+                    }}
+                    style={styles.qrCode}
+                    resizeMode="contain"
+                  />
+                  <Text style={styles.qrLabel}>Scan to verify with KRA eTIMS</Text>
+                </View>
+              </View>
+            )}
+
+            {/* Digital Signature */}
+            {(invoice as any).receiptSignature && (
+              <View style={styles.signatureSection}>
+                <View style={styles.signatureHeader}>
+                  <Icon name="shield-check" size={20} color="#000000" />
+                  <Text style={styles.signatureTitle}>Digital Signature</Text>
+                </View>
+                <View style={styles.signatureContainer}>
+                  <Text style={styles.signatureText} numberOfLines={3} ellipsizeMode="middle">
+                    {(invoice as any).receiptSignature}
+                  </Text>
+                </View>
+                <Text style={styles.signatureNote}>
+                  This signature verifies the invoice has been approved by KRA
+                </Text>
+              </View>
+            )}
+
+            {/* Internal Data */}
+            {(invoice as any).internalData && (
+              <View style={styles.internalDataSection}>
+                <Text style={styles.internalDataLabel}>KRA Internal Reference</Text>
+                <View style={styles.internalDataContainer}>
+                  <Text style={styles.internalDataText} numberOfLines={2} ellipsizeMode="middle">
+                    {(invoice as any).internalData}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {/* Export PDF Button */}
+            <TouchableOpacity
+              onPress={handleExportPDF}
+              disabled={exportingPDF}
+              style={styles.exportPDFButton}
+            >
+              {exportingPDF ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <Icon name="file-pdf-box" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+                  <Text style={styles.exportPDFText}>Export as PDF</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {/* QR Code Section - Legacy (for non-approved invoices) */}
+      {invoice.qrCodeData && !(invoice.status === 'confirmed' || invoice.status === 'SYNCED' || invoice.receiptNo) ? (
         <View style={styles.card}>
           <View style={styles.cardContent}>
             <Text style={styles.sectionTitle}>Receipt QR Code</Text>
             <View style={styles.qrContainer}>
               <Image
-                source={{ uri: `data:image/png;base64,${invoice.qrCodeData}` }}
+                source={{ 
+                  uri: invoice.qrCodeData.startsWith('data:') 
+                    ? invoice.qrCodeData 
+                    : `data:image/png;base64,${invoice.qrCodeData}` 
+                }}
                 style={styles.qrCode}
                 resizeMode="contain"
               />
@@ -557,6 +687,118 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textSecondary,
     textAlign: 'center',
+  },
+  // KRA Approval Styles
+  approvalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+    paddingBottom: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  approvalTitle: {
+    ...typography.h2,
+    color: '#34C759',
+    marginLeft: spacing.sm,
+    fontWeight: '700',
+  },
+  receiptNoContainer: {
+    backgroundColor: '#F0F9FF',
+    padding: spacing.md,
+    borderRadius: 8,
+    marginBottom: spacing.lg,
+    borderLeftWidth: 4,
+    borderLeftColor: '#007AFF',
+  },
+  receiptNoLabel: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
+  },
+  receiptNoValue: {
+    ...typography.h3,
+    color: '#007AFF',
+    fontWeight: '700',
+    fontFamily: 'monospace',
+  },
+  qrSection: {
+    marginBottom: spacing.lg,
+  },
+  qrTitle: {
+    ...typography.body,
+    fontWeight: '600',
+    marginBottom: spacing.md,
+    textAlign: 'center',
+  },
+  signatureSection: {
+    marginBottom: spacing.lg,
+  },
+  signatureHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  signatureTitle: {
+    ...typography.body,
+    fontWeight: '600',
+    marginLeft: spacing.sm,
+  },
+  signatureContainer: {
+    backgroundColor: colors.surface,
+    padding: spacing.md,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: spacing.sm,
+  },
+  signatureText: {
+    ...typography.caption,
+    fontFamily: 'monospace',
+    color: colors.text,
+    lineHeight: 18,
+  },
+  signatureNote: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontStyle: 'italic',
+    textAlign: 'center',
+  },
+  internalDataSection: {
+    marginBottom: spacing.lg,
+  },
+  internalDataLabel: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+  },
+  internalDataContainer: {
+    backgroundColor: colors.surface,
+    padding: spacing.sm,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  internalDataText: {
+    ...typography.caption,
+    fontFamily: 'monospace',
+    color: colors.text,
+    fontSize: 10,
+  },
+  exportPDFButton: {
+    backgroundColor: '#FF3B30',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: 8,
+    marginTop: spacing.md,
+  },
+  exportPDFText: {
+    ...typography.body,
+    color: '#FFFFFF',
+    fontWeight: '600',
   },
   actionsContainer: {
     padding: spacing.md,

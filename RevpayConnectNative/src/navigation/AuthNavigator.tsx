@@ -1,20 +1,27 @@
 import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 
-import OnboardingScreen from '@/screens/OnboardingScreen';
-import WelcomeScreen from '@/screens/WelcomeScreen';
 import LoginScreen from '@/screens/auth/LoginScreen';
-import RegisterScreen from '@/screens/auth/RegisterScreen';
-import OTPScreen from '@/screens/auth/OTPScreen';
+import SubscriptionPlansScreen from '@/screens/subscription/SubscriptionPlansScreen';
+import BusinessRegistrationScreen from '@/screens/subscription/BusinessRegistrationScreen';
 import { AuthStackParamList } from '@/types';
 import { colors } from '@/theme/theme';
 
 const Stack = createStackNavigator<AuthStackParamList>();
 
+/**
+ * Auth Navigator - Glovo-like subscription-first flow
+ * 
+ * Flow:
+ * 1. Login Screen (existing users)
+ * 2. Subscription Plans Screen (new users see plans first)
+ * 3. Business Registration Screen (complete registration with selected plan)
+ * 4. Auto-login and redirect to Dashboard
+ */
 const AuthNavigator: React.FC = () => {
   return (
     <Stack.Navigator
-      initialRouteName="Onboarding"
+      initialRouteName="Login"
       screenOptions={{
         headerStyle: {
           backgroundColor: colors.background,
@@ -32,32 +39,26 @@ const AuthNavigator: React.FC = () => {
       }}
     >
       <Stack.Screen 
-        name="Onboarding" 
-        component={OnboardingScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen 
-        name="Welcome" 
-        component={WelcomeScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen 
         name="Login" 
         component={LoginScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen 
-        name="Register" 
-        component={RegisterScreen}
+        name="SubscriptionPlans" 
+        component={SubscriptionPlansScreen}
         options={{ 
-          title: 'Create Account',
-          headerBackTitleVisible: false,
+          headerShown: false,
+          // Prevent going back to login from plans screen
+          gestureEnabled: false,
         }}
       />
       <Stack.Screen 
-        name="OTP" 
-        component={OTPScreen}
-        options={{ headerShown: false }}
+        name="BusinessRegistration" 
+        component={BusinessRegistrationScreen}
+        options={{ 
+          title: 'Complete Registration',
+          headerBackTitleVisible: false,
+        }}
       />
     </Stack.Navigator>
   );

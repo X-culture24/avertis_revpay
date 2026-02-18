@@ -3,11 +3,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ApiResponse, DashboardStats, Invoice, IntegrationSettings, ComplianceReport, User, AuthTokens } from '@/types';
 
 // Network configuration - use ngrok tunnel for external access
-const BASE_URL = __DEV__ ? 'https://2ec64400f7cf.ngrok-free.app' : 'https://your-production-api.com';
+const BASE_URL = __DEV__ ? 'https://e154-102-210-28-47.ngrok-free.app' : 'https://your-production-api.com';
 
 // Single server configuration using ngrok tunnel
 const POSSIBLE_URLS = [
-  'https://2ec64400f7cf.ngrok-free.app', // ngrok tunnel for external access
+  'https://e154-102-210-28-47.ngrok-free.app', // ngrok tunnel for external access
 ];
 
 class ApiService {
@@ -93,8 +93,11 @@ class ApiService {
       console.log('Response status:', response.status);
       console.log('Response data:', response.data);
 
+      // Treat 207 Multi-Status as success (invoice created but KRA submission pending)
+      const isSuccess = response.status >= 200 && response.status < 300;
+
       return {
-        success: true,
+        success: isSuccess,
         data: response.data,
       };
     } catch (error: any) {
@@ -318,6 +321,12 @@ class ApiService {
     return this.request('POST', '/invoices/retry-all/');
   }
 
+  async exportInvoicesToExcel(dateRange?: { start: string; end: string }) {
+    const endpoint = '/invoices/export-excel/';
+    const data = dateRange ? { date_range: dateRange } : {};
+    return this.request('POST', endpoint, data);
+  }
+
   // Dashboard
   async getDashboardStats() {
     return this.request('GET', '/dashboard/stats/');
@@ -355,6 +364,33 @@ class ApiService {
 
   async updateUserProfile(profileData: any) {
     return this.request('PUT', '/profile/', profileData);
+  }
+
+  // Subscription Management
+  async getSubscriptionPlans(): Promise<ApiResponse<any>> {
+    return this.request('GET', '/subscription/plans/');
+  }
+
+  async getCurrentSubscription(): Promise<ApiResponse<any>> {
+    return this.request('GET', '/subscription/current/');
+  }
+
+  async checkSubscriptionLimits(action: string): Promise<ApiResponse<any>> {
+    return this.request('POST', '/subscription/check-limits/', { action });
+  }
+
+  async initiatePayment(planId: string, paymentMethod: string): Promise<ApiResponse<any>> {
+    return this.request('POST', '/subscription/payment/initiate/', {
+      plan_id: planId,
+      payment_method: paymentMethod
+    });
+  }
+
+  async confirmPayment(paymentId: string, transactionReference: string): Promise<ApiResponse<any>> {
+    return this.request('POST', '/subscription/payment/confirm/', {
+      payment_id: paymentId,
+      transaction_reference: transactionReference
+    });
   }
 
   // Receipt

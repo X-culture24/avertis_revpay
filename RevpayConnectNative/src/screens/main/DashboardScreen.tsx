@@ -10,9 +10,11 @@ import {
   StatusBar,
   ScrollView,
   Alert,
+  TextInput,
 } from 'react-native';
 import { useRecoilState, useRecoilValue } from 'recoil';
 import { useNavigation } from '@react-navigation/native';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { colors, spacing, typography } from '@/theme/theme';
 import { dashboardStatsState, authState, integrationSettingsState } from '@/store/atoms';
@@ -27,6 +29,8 @@ const DashboardScreen: React.FC = () => {
   const integrationSettings = useRecoilValue(integrationSettingsState);
   const [refreshing, setRefreshing] = useState(false);
   const [recentInvoices, setRecentInvoices] = useState<Invoice[]>([]);
+  const [allInvoices, setAllInvoices] = useState<Invoice[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [devices, setDevices] = useState<any[]>([]);
   const [retryQueueSize, setRetryQueueSize] = useState(0);
   const [lastSync, setLastSync] = useState<string | null>(null);
@@ -44,17 +48,17 @@ const DashboardScreen: React.FC = () => {
         
         // Extract additional data from dashboard stats
         const stats = response.data as any;
-        setLastSync(stats.last_sync);
+        // Backend returns both last_sync and lastSyncTime
+        setLastSync(stats.last_sync || stats.lastSyncTime);
       }
 
-      // Fetch recent failed invoices only
-      const invoicesResponse = await apiService.getInvoices(1, 10);
+      // Fetch all recent invoices (not just failed)
+      const invoicesResponse = await apiService.getInvoices(1, 20);
       if (invoicesResponse.success && invoicesResponse.data && typeof invoicesResponse.data === 'object' && invoicesResponse.data !== null && 'results' in invoicesResponse.data) {
         const allInvoices = (invoicesResponse.data as any).results || [];
-        // Filter to show only failed invoices
-        const failedInvoices = allInvoices.filter((inv: any) => inv.status === 'failed');
-        console.log('📄 Failed invoices received:', failedInvoices.length);
-        setRecentInvoices(failedInvoices.slice(0, 5)); // Show max 5 failed invoices
+        console.log('📄 All invoices received:', allInvoices.length);
+        setAllInvoices(allInvoices); // Store all invoices for search
+        setRecentInvoices(allInvoices.slice(0, 10)); // Show max 10 recent invoices
       }
       
       // Fetch devices
@@ -140,27 +144,71 @@ const DashboardScreen: React.FC = () => {
     try {
       console.log('🔄 Triggering device sync...');
       
-      // Immediately update the lastSync timestamp to show current time
-      const currentTime = new Date().toISOString();
-      setLastSync(currentTime);
+      let syncSuccess = true;
+      let syncMessages: string[] = [];
+      let latestSyncTime: string | null = null;
       
       // Trigger sync for all devices
       for (const device of devices) {
-        await apiService.syncDevice(device.id);
+        try {
+          const response = await apiService.syncDevice(device.id);
+          if (response.success || response.data) {
+            const deviceData = response.data?.device || {};
+            const syncTime = deviceData.last_sync;
+            console.log(`✅ Device ${device.serial_number} synced at:`, syncTime);
+            
+            // Track the latest sync time
+            if (syncTime && (!latestSyncTime || new Date(syncTime) > new Date(latestSyncTime))) {
+              latestSyncTime = syncTime;
+            }
+            
+            if (response.data?.warning) {
+              syncMessages.push(response.data.warning);
+            }
+          } else {
+            syncSuccess = false;
+            syncMessages.push(`${device.serial_number}: ${response.message || 'Sync failed'}`);
+          }
+        } catch (error) {
+          console.error(`❌ Error syncing device ${device.serial_number}:`, error);
+          syncSuccess = false;
+        }
+      }
+      
+      // Update lastSync with the actual sync time from the response
+      if (latestSyncTime) {
+        console.log('📅 Setting lastSync to:', latestSyncTime);
+        setLastSync(latestSyncTime);
       }
       
       // Trigger VSCU sync if available
       if (dashboardStats?.integration_mode === 'vscu' || dashboardStats?.integration_mode === 'mixed') {
-        await apiService.triggerVSCUSync();
+        try {
+          await apiService.triggerVSCUSync();
+        } catch (error) {
+          console.log('ℹ️ VSCU sync not available');
+        }
       }
       
-      Alert.alert('Success', 'Device sync initiated successfully');
-      await fetchDashboardData(); // Refresh data to get updated backend timestamp
+      // Refresh other dashboard data (but lastSync is already set from sync response)
+      await fetchDashboardData();
+      
+      // Re-apply the sync time after fetch (in case it got overwritten)
+      if (latestSyncTime) {
+        console.log('📅 Re-applying lastSync after fetch:', latestSyncTime);
+        setLastSync(latestSyncTime);
+      }
+      
+      if (syncSuccess) {
+        Alert.alert('Success', syncMessages.length > 0 
+          ? `Device sync completed.\n\n${syncMessages.join('\n')}`
+          : 'Device sync completed successfully');
+      } else {
+        Alert.alert('Partial Success', `Some devices synced with issues:\n\n${syncMessages.join('\n')}`);
+      }
     } catch (error) {
       console.error('❌ Error syncing devices:', error);
       Alert.alert('Error', 'Failed to sync devices. Please try again.');
-      // Revert the optimistic update on error
-      await fetchDashboardData();
     }
   };
 
@@ -198,6 +246,33 @@ const DashboardScreen: React.FC = () => {
     }
   };
 
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour >= 5 && hour < 12) {
+      return 'Good morning';
+    } else if (hour >= 12 && hour < 17) {
+      return 'Good afternoon';
+    } else if (hour >= 17 && hour < 21) {
+      return 'Good evening';
+    } else {
+      return 'Welcome back';
+    }
+  };
+
+  const getUserDisplayName = () => {
+    // Check all possible user name fields from the API response
+    if (user) {
+      return user.full_name || 
+             user.first_name || 
+             user.businessName || 
+             (user as any).name || 
+             (user as any).username || 
+             (user as any).company_name || 
+             'User';
+    }
+    return 'User';
+  };
+
 
   return (
     <SafeAreaView style={styles.container}>
@@ -212,13 +287,15 @@ const DashboardScreen: React.FC = () => {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            <Text style={styles.greeting}>Welcome back</Text>
-            <Text style={styles.userName}>{user?.email || user?.businessName || 'User'}</Text>
+            <Text style={styles.greeting}>{getGreeting()}</Text>
+            <Text style={styles.userName}>
+              {getUserDisplayName()}
+            </Text>
           </View>
           <TouchableOpacity style={styles.profileButton}>
             <View style={styles.profileAvatar}>
               <Text style={styles.profileInitial}>
-                {(user?.email || user?.businessName || 'U').charAt(0).toUpperCase()}
+                {getUserDisplayName().charAt(0).toUpperCase()}
               </Text>
             </View>
           </TouchableOpacity>
@@ -226,7 +303,10 @@ const DashboardScreen: React.FC = () => {
 
         {/* Balance Card */}
         <View style={styles.balanceCard}>
-          <Text style={styles.balanceLabel}>Total Revenue</Text>
+          <View style={styles.balanceHeader}>
+            <Icon name="wallet" size={32} color="#000000" />
+            <Text style={styles.balanceLabel}>Total Revenue</Text>
+          </View>
           <Text style={styles.balanceAmount}>
             KES {dashboardStats?.total_revenue ? Number(dashboardStats.total_revenue).toLocaleString() : '0.00'}
           </Text>
@@ -235,11 +315,13 @@ const DashboardScreen: React.FC = () => {
               style={styles.actionButton}
               onPress={() => (navigation as any).navigate('Invoices')}
             >
+              <Icon name="file-document-outline" size={16} color="#000000" style={{ marginRight: 4 }} />
               <Text style={styles.actionButtonText}>
                 {dashboardStats?.total_invoices || 0} Invoices
               </Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.actionButton}>
+              <Icon name="trending-up" size={16} color="#000000" style={{ marginRight: 4 }} />
               <Text style={styles.actionButtonText}>
                 {dashboardStats?.success_rate || 0}% Success
               </Text>
@@ -304,6 +386,7 @@ const DashboardScreen: React.FC = () => {
         {/* System Status Cards */}
         <View style={styles.statusContainer}>
           <View style={styles.statusCard}>
+            <Icon name="server" size={24} color="#000000" style={{ marginBottom: 8 }} />
             <Text style={styles.statusLabel}>Integration Mode</Text>
             <Text style={styles.statusValue}>
               {getIntegrationModeDisplay(dashboardStats?.integration_mode || 'none')}
@@ -312,12 +395,13 @@ const DashboardScreen: React.FC = () => {
           </View>
           
           <View style={styles.statusCard}>
+            <Icon name="devices" size={24} color="#000000" style={{ marginBottom: 8 }} />
             <Text style={styles.statusLabel}>Active Devices</Text>
             <Text style={styles.statusValue}>
               {dashboardStats?.active_devices || 0} / {devices.length}
             </Text>
             <TouchableOpacity onPress={handleDeviceRegistration} style={styles.addDeviceButton}>
-              <Text style={styles.addDeviceText}>+</Text>
+              <Icon name="plus" size={16} color="#000000" />
             </TouchableOpacity>
           </View>
         </View>
@@ -327,6 +411,7 @@ const DashboardScreen: React.FC = () => {
             style={styles.statusCard}
             onPress={() => (navigation as any).navigate('Invoices')}
           >
+            <Icon name="refresh" size={24} color="#000000" style={{ marginBottom: 8 }} />
             <Text style={styles.statusLabel}>Retry Queue</Text>
             <Text style={[styles.statusValue, { color: getStatusColor('retry') }]}>
               {retryQueueSize || 0}
@@ -335,11 +420,13 @@ const DashboardScreen: React.FC = () => {
           </TouchableOpacity>
           
           <View style={styles.statusCard}>
+            <Icon name="sync" size={24} color="#000000" style={{ marginBottom: 8 }} />
             <Text style={styles.statusLabel}>Last Sync</Text>
             <Text style={styles.statusValue}>
               {lastSync ? new Date(lastSync).toLocaleTimeString() : 'Never'}
             </Text>
             <TouchableOpacity onPress={handleSyncDevices} style={styles.syncButton}>
+              <Icon name="sync" size={14} color="#000000" style={{ marginRight: 4 }} />
               <Text style={styles.syncButtonText}>Sync</Text>
             </TouchableOpacity>
           </View>
@@ -355,6 +442,7 @@ const DashboardScreen: React.FC = () => {
             style={styles.quickActionCard}
             onPress={() => (navigation as any).navigate('Invoices', { screen: 'CreateInvoice' })}
           >
+            <Icon name="plus-circle" size={32} color="#000000" style={{ marginBottom: 8 }} />
             <Text style={styles.quickActionTitle}>Create Invoice</Text>
             <Text style={styles.quickActionSubtitle}>New transaction</Text>
           </TouchableOpacity>
@@ -363,6 +451,7 @@ const DashboardScreen: React.FC = () => {
             style={styles.quickActionCard}
             onPress={() => (navigation as any).navigate('Invoices')}
           >
+            <Icon name="file-document-multiple" size={32} color="#000000" style={{ marginBottom: 8 }} />
             <Text style={styles.quickActionTitle}>View Invoices</Text>
             <Text style={styles.quickActionSubtitle}>All transactions</Text>
           </TouchableOpacity>
@@ -371,6 +460,7 @@ const DashboardScreen: React.FC = () => {
             style={styles.quickActionCard}
             onPress={() => (navigation as any).navigate('Reports')}
           >
+            <Icon name="chart-bar" size={32} color="#000000" style={{ marginBottom: 8 }} />
             <Text style={styles.quickActionTitle}>Reports</Text>
             <Text style={styles.quickActionSubtitle}>Analytics</Text>
           </TouchableOpacity>
@@ -379,60 +469,113 @@ const DashboardScreen: React.FC = () => {
             style={styles.quickActionCard}
             onPress={() => (navigation as any).navigate('SettingsTab')}
           >
+            <Icon name="cog" size={32} color="#000000" style={{ marginBottom: 8 }} />
             <Text style={styles.quickActionTitle}>Settings</Text>
             <Text style={styles.quickActionSubtitle}>Configuration</Text>
           </TouchableOpacity>
         </View>
 
 
-        {/* Recent Activity Header */}
+        {/* Recent Invoices Header with Search */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Failed Invoices</Text>
+          <Text style={styles.sectionTitle}>Recent Invoices</Text>
           <TouchableOpacity onPress={() => (navigation as any).navigate('Invoices')}>
             <Text style={styles.viewAllText}>View all</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Failed Invoices List */}
+        {/* Search Bar */}
+        <View style={styles.searchContainer}>
+          <Icon name="magnify" size={20} color="#000000" style={{ marginRight: spacing.sm }} />
+          <TextInput
+            placeholder="Search invoices..."
+            value={searchQuery}
+            onChangeText={(text) => {
+              setSearchQuery(text);
+              // Filter invoices based on search
+              if (text.trim() === '') {
+                setRecentInvoices(allInvoices.slice(0, 10));
+              } else {
+                const filtered = allInvoices.filter((inv: any) => {
+                  const customerName = (inv.customer_name || inv.customerName || '').toLowerCase();
+                  const invoiceNo = (inv.invoice_no || inv.invoiceNumber || '').toLowerCase();
+                  const receiptNo = (inv.receipt_no || inv.receiptNo || '').toLowerCase();
+                  const searchLower = text.toLowerCase();
+                  return customerName.includes(searchLower) || 
+                         invoiceNo.includes(searchLower) || 
+                         receiptNo.includes(searchLower);
+                });
+                setRecentInvoices(filtered.slice(0, 10));
+              }
+            }}
+            style={styles.searchInput}
+            placeholderTextColor={colors.textSecondary}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => {
+              setSearchQuery('');
+              setRecentInvoices(allInvoices.slice(0, 10));
+            }}>
+              <Icon name="close-circle" size={20} color="#000000" />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* All Invoices List */}
         <View style={styles.transactionList}>
           {recentInvoices.length > 0 ? (
             recentInvoices.map((invoice, index) => (
-              <View key={invoice.id} style={styles.transactionItem}>
-                <View style={styles.transactionIcon}>
-                  <View style={[styles.iconCircle, { backgroundColor: getStatusColor(invoice.status) }]}>
-                    <Text style={styles.iconText}>
-                      {((invoice as any).customer_name || invoice.customerName || 'C').charAt(0).toUpperCase()}
+              <TouchableOpacity 
+                key={invoice.id}
+                onPress={() => (navigation as any).navigate('Invoices', { 
+                  screen: 'InvoiceDetails', 
+                  params: { invoiceId: invoice.id } 
+                })}
+              >
+                <View style={styles.transactionItem}>
+                  <View style={styles.transactionIcon}>
+                    <View style={[styles.iconCircle, { backgroundColor: getStatusColor(invoice.status) }]}>
+                      <Text style={styles.iconText}>
+                        {((invoice as any).customer_name || invoice.customerName || 'C').charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.transactionDetails}>
+                    <Text style={styles.transactionName}>{(invoice as any).customer_name || invoice.customerName || 'Unknown Customer'}</Text>
+                    <Text style={styles.transactionDate}>
+                      {(invoice as any).created_at ? new Date((invoice as any).created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 
+                       invoice.createdAt ? new Date(invoice.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'No date'}
                     </Text>
+                    <View style={[styles.statusBadge, { backgroundColor: getStatusColor(invoice.status) }]}>
+                      <Text style={styles.statusBadgeText}>{invoice.status?.toUpperCase() || 'UNKNOWN'}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.transactionAmount}>
+                    <Text style={styles.amountText}>KES {(invoice as any).total_amount ? Number((invoice as any).total_amount).toLocaleString() : 
+                      invoice.totalAmount ? invoice.totalAmount.toLocaleString() : '0'}</Text>
+                    {((invoice as any).receipt_no) && (
+                      <Text style={styles.receiptText}>#{(invoice as any).receipt_no}</Text>
+                    )}
+                    {invoice.status === 'failed' && (
+                      <TouchableOpacity 
+                        style={styles.invoiceRetryButton}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          handleRetryInvoice(invoice.id);
+                        }}
+                      >
+                        <Text style={styles.invoiceRetryButtonText}>Retry</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </View>
-                <View style={styles.transactionDetails}>
-                  <Text style={styles.transactionName}>{(invoice as any).customer_name || invoice.customerName || 'Unknown Customer'}</Text>
-                  <Text style={styles.transactionDate}>
-                    {(invoice as any).created_at ? new Date((invoice as any).created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 
-                     invoice.createdAt ? new Date(invoice.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'No date'}
-                  </Text>
-                  <View style={[styles.statusBadge, { backgroundColor: getStatusColor(invoice.status) }]}>
-                    <Text style={styles.statusBadgeText}>{invoice.status?.toUpperCase() || 'UNKNOWN'}</Text>
-                  </View>
-                </View>
-                <View style={styles.transactionAmount}>
-                  <Text style={styles.amountText}>KES {(invoice as any).total_amount ? Number((invoice as any).total_amount).toLocaleString() : 
-                    invoice.totalAmount ? invoice.totalAmount.toLocaleString() : '0'}</Text>
-                  {((invoice as any).receipt_no) && (
-                    <Text style={styles.receiptText}>#{(invoice as any).receipt_no}</Text>
-                  )}
-                  <TouchableOpacity 
-                    style={styles.invoiceRetryButton}
-                    onPress={() => handleRetryInvoice(invoice.id)}
-                  >
-                    <Text style={styles.invoiceRetryButtonText}>Retry</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
+              </TouchableOpacity>
             ))
           ) : (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>No failed invoices</Text>
+              <Text style={styles.emptyStateText}>
+                {searchQuery ? 'No invoices found' : 'No invoices yet'}
+              </Text>
             </View>
           )}
         </View>
@@ -494,11 +637,18 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: spacing.lg,
   },
+  balanceHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+    gap: spacing.sm,
+  },
   balanceLabel: {
     ...typography.body,
     color: colors.secondary,
     opacity: 0.8,
-    marginBottom: spacing.xs,
+    fontSize: 16,
+    fontWeight: '600',
   },
   balanceAmount: {
     ...typography.h1,
@@ -512,10 +662,12 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     flex: 1,
+    flexDirection: 'row',
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     paddingVertical: spacing.md,
     borderRadius: 12,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   actionButtonText: {
     ...typography.body,
@@ -829,6 +981,24 @@ const styles = StyleSheet.create({
     color: colors.secondary,
     fontSize: 11,
     fontWeight: '600',
+  },
+  // Search container styles
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.card,
+    borderRadius: 8,
+    paddingHorizontal: spacing.md,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    fontSize: typography.body.fontSize,
+    color: colors.text,
   },
   // Legacy styles for compatibility
   quickAction: {

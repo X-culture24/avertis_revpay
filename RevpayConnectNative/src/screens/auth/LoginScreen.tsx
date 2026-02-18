@@ -3,27 +3,22 @@ import {
   View,
   Text,
   StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  Alert,
   TextInput,
   TouchableOpacity,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useSetRecoilState } from 'recoil';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { colors, spacing, typography } from '@/theme/theme';
-import { authState } from '@/store/atoms';
 import { apiService } from '@/services/api';
-import { AuthStackParamList } from '@/types';
-import { StackNavigationProp } from '@react-navigation/stack';
-
-type LoginScreenNavigationProp = StackNavigationProp<AuthStackParamList, 'Login'>;
+import { authState } from '@/store/atoms';
 
 const LoginScreen: React.FC = () => {
-  const navigation = useNavigation<LoginScreenNavigationProp>();
+  const navigation = useNavigation();
   const setAuth = useSetRecoilState(authState);
   
   const [email, setEmail] = useState('');
@@ -33,139 +28,98 @@ const LoginScreen: React.FC = () => {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
+      Alert.alert('Error', 'Please enter your email and password');
       return;
     }
 
     setLoading(true);
     try {
-      // Test connectivity first - try to find working URL
-      console.log('Testing backend connectivity...');
-      console.log('Available URLs to test:', ['https://2ec64400f7cf.ngrok-free.app']);
-      
-      const workingURL = await apiService.findWorkingURL();
-      console.log('🔍 Working URL result:', workingURL);
-      
-      // Try to login even if findWorkingURL fails - the server might still work
-      console.log('🚀 Attempting login regardless of URL test result...');
-      
-      if (!workingURL) {
-        console.log('⚠️ No working URL found in test, but trying login anyway...');
-        
-        // Test each URL individually and show results
-        for (const url of ['https://2ec64400f7cf.ngrok-free.app']) {
-          try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 3000);
-            
-            const testResponse = await fetch(url + '/api/mobile/', { 
-              method: 'GET',
-              signal: controller.signal
-            });
-            
-            clearTimeout(timeoutId);
-            console.log(`${url}/api/mobile/ - Response: ${testResponse.status}`);
-          } catch (error: any) {
-            console.log(`${url}/api/mobile/ - Error: ${error.message}`);
-          }
-        }
-        
-        console.log('⚠️ Connection test failed, but attempting login anyway...');
-      }
-      console.log('✅ Found working backend URL:', workingURL);
-
-      console.log('Backend is reachable, attempting login...');
       const response = await apiService.login({ email, password });
-      console.log('Login attempt completed:', response);
       
-      if (response.success) {
-        console.log('✅ Login successful, storing tokens and setting auth state');
+      if (response.success && response.data) {
         setAuth({
           isAuthenticated: true,
-          user: response.data?.user || { email },
-          tokens: { access: response.data?.token || '', refresh: response.data?.refresh || '' },
-          loading: false
+          user: response.data.user,
+          token: response.data.token,
         });
+        // Navigation will automatically go to Main/Subscription screen
       } else {
         Alert.alert('Login Failed', response.message || 'Invalid credentials');
       }
-    } catch (error) {
-      console.error('Login error:', error);
-      Alert.alert('Error', 'Network error occurred');
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'An error occurred');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Revpay Connect</Text>
-          <Text style={styles.subtitle}>Tax Compliance Platform</Text>
+      <View style={styles.content}>
+        <Text style={styles.title}>Welcome back</Text>
+        <Text style={styles.subtitle}>Email</Text>
+
+        <View style={styles.inputContainer}>
+          <Icon name="email-outline" size={20} color={colors.textSecondary} style={styles.icon} />
+          <TextInput
+            style={styles.input}
+            placeholder="Enter your email address"
+            placeholderTextColor={colors.textSecondary}
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            keyboardType="email-address"
+          />
         </View>
 
-        <View style={styles.card}>
-          <View style={styles.cardContent}>
-            <Text style={styles.welcomeText}>Welcome Back</Text>
-            
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Username</Text>
-              <TextInput
-                value={email}
-                onChangeText={setEmail}
-                autoCapitalize="none"
-                style={styles.textInput}
-                placeholder="Enter your username"
-                placeholderTextColor={colors.textSecondary}
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Password</Text>
-              <View style={styles.passwordContainer}>
-                <TextInput
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry={!showPassword}
-                  style={styles.textInput}
-                  placeholder="Enter your password"
-                  placeholderTextColor={colors.textSecondary}
-                />
-                <TouchableOpacity
-                  onPress={() => setShowPassword(!showPassword)}
-                  style={styles.showPasswordButton}
-                >
-                  <Text style={styles.showPasswordText}>{showPassword ? "Hide" : "Show"}</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <TouchableOpacity
-              onPress={handleLogin}
-              disabled={loading}
-              style={[styles.loginButton, loading && styles.disabledButton]}
-            >
-              <Text style={styles.loginButtonText}>
-                {loading ? 'Signing In...' : 'Sign In'}
-              </Text>
-            </TouchableOpacity>
-
-            <View style={styles.registerContainer}>
-              <Text style={styles.registerText}>Don't have an account? </Text>
-              <TouchableOpacity
-                onPress={() => navigation.navigate('Register')}
-                style={styles.registerButton}
-              >
-                <Text style={styles.registerButtonText}>Create Account</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+        <Text style={styles.subtitle}>Password</Text>
+        <View style={styles.inputContainer}>
+          <Icon name="lock-outline" size={20} color={colors.textSecondary} style={styles.icon} />
+          <TextInput
+            style={styles.input}
+            placeholder="Enter your password"
+            placeholderTextColor={colors.textSecondary}
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry={!showPassword}
+          />
+          <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+            <Icon
+              name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+              size={20}
+              color={colors.textSecondary}
+            />
+          </TouchableOpacity>
         </View>
-      </ScrollView>
+
+        <TouchableOpacity style={styles.forgotPassword}>
+          <Text style={styles.forgotPasswordText}>Forgot password?</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.loginButton}
+          onPress={handleLogin}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color={colors.secondary} />
+          ) : (
+            <Text style={styles.loginButtonText}>Login</Text>
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.createAccount}
+          onPress={() => (navigation as any).navigate('BusinessRegistration')}
+        >
+          <Text style={styles.createAccountText}>
+            Create account? <Text style={styles.createAccountLink}>Register</Text>
+          </Text>
+        </TouchableOpacity>
+      </View>
     </KeyboardAvoidingView>
   );
 };
@@ -175,118 +129,71 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  scrollContainer: {
-    flexGrow: 1,
+  content: {
+    flex: 1,
+    padding: spacing.xl,
     justifyContent: 'center',
-    padding: spacing.md,
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: spacing.xl,
   },
   title: {
     ...typography.h1,
-    marginBottom: spacing.xs,
+    fontSize: 28,
+    marginBottom: spacing.xl,
   },
   subtitle: {
-    ...typography.caption,
-    textAlign: 'center',
-  },
-  card: {
-    backgroundColor: colors.card,
-    elevation: 4,
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    borderRadius: 16,
-  },
-  cardContent: {
-    padding: spacing.lg,
-  },
-  welcomeText: {
-    ...typography.h2,
-    textAlign: 'center',
-    marginBottom: spacing.lg,
-  },
-  input: {
-    marginBottom: spacing.md,
-    backgroundColor: colors.background,
-  },
-  passwordContainer: {
-    position: 'relative',
-    marginBottom: spacing.md,
-  },
-  passwordInput: {
-    marginBottom: 0,
-    paddingRight: 60,
-  },
-  showPasswordButton: {
-    position: 'absolute',
-    right: 8,
-    top: 8,
-    minWidth: 50,
-  },
-  loginButton: {
-    marginTop: spacing.md,
-    marginBottom: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderRadius: 12,
-    elevation: 2,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-  },
-  registerContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  registerText: {
     ...typography.body,
     color: colors.textSecondary,
+    marginBottom: spacing.sm,
+    marginTop: spacing.md,
   },
   inputContainer: {
-    marginBottom: spacing.md,
-  },
-  inputLabel: {
-    ...typography.body,
-    fontWeight: '600',
-    marginBottom: spacing.xs,
-    color: colors.text,
-  },
-  textInput: {
+    flexDirection: 'row',
+    alignItems: 'center',
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 8,
-    padding: spacing.md,
-    backgroundColor: colors.background,
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.md,
+    backgroundColor: colors.card,
+  },
+  icon: {
+    marginRight: spacing.sm,
+  },
+  input: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    ...typography.body,
     color: colors.text,
-    fontSize: 16,
   },
-  showPasswordText: {
+  forgotPassword: {
+    alignSelf: 'flex-end',
+    marginBottom: spacing.xl,
+  },
+  forgotPasswordText: {
+    ...typography.caption,
     color: colors.primary,
-    fontWeight: '600',
-    fontSize: 14,
   },
-  disabledButton: {
-    opacity: 0.6,
+  loginButton: {
+    backgroundColor: colors.text,
+    paddingVertical: spacing.md,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: spacing.lg,
   },
   loginButtonText: {
-    color: colors.secondary,
-    fontWeight: 'bold',
-    fontSize: 16,
+    ...typography.body,
+    color: colors.background,
+    fontWeight: '600',
   },
-  registerButton: {
-    padding: spacing.xs,
+  createAccount: {
+    alignItems: 'center',
   },
-  registerButtonText: {
+  createAccountText: {
+    ...typography.body,
+    color: colors.textSecondary,
+  },
+  createAccountLink: {
     color: colors.primary,
     fontWeight: '600',
-    fontSize: 16,
   },
 });
 

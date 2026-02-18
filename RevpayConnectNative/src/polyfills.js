@@ -1,4 +1,8 @@
-// Polyfills for React Native performance issues
+// Polyfills for React Native
+
+// Import crypto and URL polyfills first
+import 'react-native-get-random-values';
+import 'react-native-url-polyfill/auto';
 
 // Fix for RawPerformanceEntry undefined error
 if (typeof global.performance === 'undefined') {

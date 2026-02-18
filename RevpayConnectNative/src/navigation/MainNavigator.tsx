@@ -1,7 +1,7 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
-import { Text } from 'react-native';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import DashboardScreen from '@/screens/main/DashboardScreen';
 import InvoicesScreen from '@/screens/main/InvoicesScreen';
@@ -15,8 +15,6 @@ import NotificationsScreen from '@/screens/main/NotificationsScreen';
 import SubscriptionScreen from '@/screens/main/SubscriptionScreen';
 import HelpSupportScreen from '@/screens/main/HelpSupportScreen';
 import DataStorageScreen from '@/screens/main/DataStorageScreen';
-import CompanyRegistrationScreen from '@/screens/setup/CompanyRegistrationScreen';
-import DeviceSetupScreen from '@/screens/setup/DeviceSetupScreen';
 import { MainTabParamList, RootStackParamList } from '@/types';
 import { colors } from '@/theme/theme';
 
@@ -103,22 +101,6 @@ const SettingsStack = () => (
       }}
     />
     <Stack.Screen 
-      name="CompanyRegistration" 
-      component={CompanyRegistrationScreen}
-      options={{ 
-        title: 'Company Registration',
-        headerBackTitleVisible: false,
-      }}
-    />
-    <Stack.Screen 
-      name="DeviceSetup" 
-      component={DeviceSetupScreen}
-      options={{ 
-        title: 'Device Setup',
-        headerBackTitleVisible: false,
-      }}
-    />
-    <Stack.Screen 
       name="Notifications" 
       component={NotificationsScreen}
       options={{ 
@@ -158,22 +140,22 @@ const MainNavigator: React.FC = () => {
     <Tab.Navigator
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused, color, size }) => {
-          let iconText;
+          let iconName;
           
           if (route.name === 'Dashboard') {
-            iconText = focused ? '🏠' : '🏡';
+            iconName = 'view-dashboard';
           } else if (route.name === 'Invoices') {
-            iconText = focused ? '📄' : '📃';
+            iconName = 'file-document-multiple';
           } else if (route.name === 'Reports') {
-            iconText = focused ? '📊' : '📈';
+            iconName = 'chart-bar';
           } else if (route.name === 'SettingsTab') {
-            iconText = focused ? '⚙️' : '🔧';
+            iconName = 'cog';
           }
           
-          return <Text style={{ fontSize: size, color }}>{iconText}</Text>;
+          return <Icon name={iconName || 'circle'} size={size} color="#000000" />;
         },
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textSecondary,
+        tabBarActiveTintColor: '#000000',
+        tabBarInactiveTintColor: '#757575',
         tabBarStyle: {
           backgroundColor: colors.background,
           borderTopColor: colors.border,

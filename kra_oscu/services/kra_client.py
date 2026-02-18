@@ -13,6 +13,7 @@ from django.utils import timezone as django_timezone
 import logging
 
 from ..models import Device, Invoice, ApiLog
+from .kra_mock_service import KRAMockService
 
 logger = logging.getLogger(__name__)
 
@@ -26,9 +27,17 @@ class KRAClient:
     """
     Client for KRA eTIMS OSCU API communication.
     Handles device registration, sales transmission, and status checks.
+    Supports mock mode for testing.
     """
     
-    def __init__(self):
+    def __init__(self, use_mock=None):
+        """
+        Initialize KRA Client
+        
+        Args:
+            use_mock: Override mock mode. If None, uses settings.KRA_USE_MOCK
+        """
+        self.use_mock = use_mock if use_mock is not None else getattr(settings, 'KRA_USE_MOCK', True)
         self.base_url = self._get_base_url()
         self.timeout = settings.KRA_TIMEOUT
         self.session = requests.Session()
@@ -39,6 +48,11 @@ class KRAClient:
             'Authorization': 'Bearer sandbox-token',  # KRA sandbox requires auth header
             'X-API-Version': '1.0'
         })
+        
+        if self.use_mock:
+            logger.info("KRA Client initialized in MOCK mode")
+        else:
+            logger.info(f"KRA Client initialized for {settings.KRA_ENVIRONMENT} environment")
 
     def _get_base_url(self) -> str:
         """Get KRA base URL based on environment"""
@@ -70,32 +84,49 @@ class KRAClient:
         logger.info(f"Returning mock response for sandbox endpoint: {endpoint}")
         
         if endpoint == "/etims-api/selectInitOsdcInfo":
+            # Generate a realistic CMC key for testing
+            import hashlib
+            device_info = f"{payload.get('tin', 'UNKNOWN')}{payload.get('dvcSrlNo', 'UNKNOWN')}"
+            cmc_key = f"CMC_{hashlib.md5(device_info.encode()).hexdigest()[:16].upper()}"
+            
             return {
                 "resultCd": "000",
                 "resultMsg": "Success",
                 "data": {
-                    "cmcKey": f"MOCK_CMC_KEY_{payload.get('dvcSrlNo', 'UNKNOWN')}_{datetime.now().strftime('%Y%m%d%H%M%S')}",
+                    "cmcKey": cmc_key,
                     "tin": payload.get("tin"),
                     "bhfId": payload.get("bhfId"),
                     "dvcSrlNo": payload.get("dvcSrlNo"),
-                    "status": "active"
+                    "status": "active",
+                    "registrationDate": datetime.now().strftime('%Y%m%d%H%M%S'),
+                    "expiryDate": "20251231235959"  # Valid until end of 2025
                 }
             }
         elif endpoint == "/etims-api/saveTrnsSalesOsdc":
+            # Generate realistic receipt number
+            receipt_no = f"ETR{datetime.now().strftime('%Y%m%d%H%M%S')}"
+            
             return {
                 "resultCd": "000",
                 "resultMsg": "Success",
                 "data": {
-                    "rcptNo": f"MOCK_RCPT_{datetime.now().strftime('%Y%m%d%H%M%S')}",
-                    "intrlData": f"MOCK_SIGNATURE_{payload.get('sarNo', 'UNKNOWN')}",
-                    "rcptSign": "MOCK_RECEIPT_SIGNATURE"
+                    "rcptNo": receipt_no,
+                    "intrlData": f"INTERNAL_DATA_{receipt_no}",
+                    "rcptSign": f"SIGNATURE_{receipt_no}",
+                    "totRcptNo": 1,
+                    "vsdcRcptPbctDate": datetime.now().strftime('%Y%m%d%H%M%S'),
+                    "sdcDateTime": datetime.now().strftime('%Y%m%d%H%M%S'),
+                    "qrCode": f"QR_{receipt_no}"
                 }
             }
         else:
             return {
                 "resultCd": "000",
                 "resultMsg": "Success - Mock Response",
-                "data": {}
+                "data": {
+                    "timestamp": datetime.now().strftime('%Y%m%d%H%M%S'),
+                    "status": "success"
+                }
             }
 
     def _generate_signature(self, payload: Dict[str, Any], device: Optional[Device] = None) -> str:
@@ -130,12 +161,6 @@ class KRAClient:
                      is_retry: bool = False) -> Dict[str, Any]:
         """Make HTTP request to KRA API with logging"""
         
-        # For sandbox environment, use mock responses for testing
-        if settings.KRA_ENVIRONMENT == 'sandbox':
-            # Always use mock responses in sandbox for reliable testing
-            logger.info(f"Using sandbox mock response for endpoint: {endpoint}")
-            return self._get_mock_response(endpoint, payload)
-            
         url = f"{self.base_url}{endpoint}"
         request_payload = json.dumps(payload, indent=2)
         
@@ -238,6 +263,28 @@ class KRAClient:
         Initialize device with KRA OSCU.
         Calls /selectInitOsdcInfo endpoint to get CMC key.
         """
+        # Use mock service if enabled
+        if self.use_mock:
+            logger.info(f"Using MOCK service for device initialization: {tin}")
+            mock_response = KRAMockService.initialize_device({
+                'tin': tin,
+                'bhfId': bhf_id,
+                'dvcSrlNo': serial_number,
+                'dvcNm': device_name
+            })
+            
+            if mock_response['resultCd'] == '000':
+                # Extract CMC key from mock response (matches real KRA format)
+                cmc_key = mock_response['data'].get('cmcKey') or mock_response['data'].get('deviceId')
+                return {
+                    "success": True,
+                    "cmc_key": cmc_key,
+                    "message": "Device initialized successfully (MOCK)",
+                    "data": mock_response['data']
+                }
+            else:
+                raise KRAClientError(f"Mock initialization failed: {mock_response['resultMsg']}")
+        
         payload = {
             "tin": tin,
             "bhfId": bhf_id,
@@ -334,6 +381,47 @@ class KRAClient:
         Calls /saveTrnsSalesOsdc endpoint.
         """
         from .payload_builder import PayloadBuilder
+        
+        # Use mock service if enabled
+        if self.use_mock:
+            logger.info(f"Using MOCK service for invoice submission: {invoice.invoice_no}")
+            
+            # Build basic payload for mock (matches KRA format)
+            mock_payload = {
+                'tin': invoice.device.company.tin if invoice.device and invoice.device.company else '',
+                'invcNo': invoice.invoice_no,
+                'totAmt': float(invoice.total_amount),
+                'internalData': f'MOCK_{invoice.invoice_no}'
+            }
+            
+            mock_response = KRAMockService.save_invoice(mock_payload)
+            
+            if mock_response['resultCd'] == '000':
+                receipt_data = mock_response['data']
+                # Handle both old and new format
+                receipt_no = receipt_data.get('rcptNo') or receipt_data.get('receiptNo')
+                internal_data = receipt_data.get('intrlData') or receipt_data.get('internalData')
+                receipt_signature = receipt_data.get('rcptSign') or receipt_data.get('receiptSignature')
+                qr_code = receipt_data.get('qrCode')
+                
+                return {
+                    "success": True,
+                    "receipt_no": str(receipt_no),
+                    "internal_data": internal_data,
+                    "receipt_signature": receipt_signature,
+                    "qr_code": qr_code,
+                    "verification_url": f"https://etims.kra.go.ke/verify/{receipt_no}",
+                    "message": "Invoice sent successfully (MOCK)",
+                    "data": receipt_data
+                }
+            else:
+                return {
+                    "success": False,
+                    "error_code": mock_response['resultCd'],
+                    "error_message": mock_response['resultMsg'],
+                    "is_retryable": False,
+                    "data": mock_response
+                }
         
         try:
             # Build KRA payload

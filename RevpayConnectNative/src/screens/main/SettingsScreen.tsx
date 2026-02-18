@@ -14,6 +14,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '@/types';
 import { useRecoilState, useRecoilValue, useSetRecoilState } from 'recoil';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { colors, spacing, typography } from '@/theme/theme';
 import { integrationSettingsState, authState } from '@/store/atoms';
@@ -29,6 +30,7 @@ const SettingsScreen: React.FC = () => {
   const setAuth = useSetRecoilState(authState);
   
   const [loading, setLoading] = useState(false);
+  const [exportLoading, setExportLoading] = useState(false);
   const [formData, setFormData] = useState({
     mode: 'OSCU' as 'OSCU' | 'VSCU',
     kraApiCredentials: '',
@@ -92,6 +94,22 @@ const SettingsScreen: React.FC = () => {
         },
       ]
     );
+  };
+
+  const handleExportExcel = async () => {
+    setExportLoading(true);
+    try {
+      const response = await apiService.exportInvoicesToExcel();
+      if (response.success) {
+        Alert.alert('Success', 'Invoice data exported successfully');
+      } else {
+        Alert.alert('Error', response.message || 'Failed to export data');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to export data. Please try again.');
+    } finally {
+      setExportLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -237,13 +255,13 @@ const SettingsScreen: React.FC = () => {
             onPress={() => (navigation as any).navigate('Profile')}
           >
             <View style={styles.listItemContent}>
-              <Text style={styles.listItemIcon}>👤</Text>
+              <Icon name="account" size={20} color="#000000" style={styles.listItemIcon} />
               <View style={styles.listItemText}>
                 <Text style={styles.listItemTitle}>Profile</Text>
                 <Text style={styles.listItemDescription}>Manage your business profile</Text>
               </View>
             </View>
-            <Text style={styles.listItemChevron}>›</Text>
+            <Icon name="chevron-right" size={20} color="#000000" />
           </TouchableOpacity>
           
           <View style={styles.listDivider} />
@@ -253,13 +271,13 @@ const SettingsScreen: React.FC = () => {
             onPress={() => (navigation as any).navigate('Subscription')}
           >
             <View style={styles.listItemContent}>
-              <Text style={styles.listItemIcon}>💳</Text>
+              <Icon name="credit-card" size={20} color="#000000" style={styles.listItemIcon} />
               <View style={styles.listItemText}>
                 <Text style={styles.listItemTitle}>Subscription</Text>
                 <Text style={styles.listItemDescription}>Current plan: {user?.subscriptionType || 'Free'}</Text>
               </View>
             </View>
-            <Text style={styles.listItemChevron}>›</Text>
+            <Icon name="chevron-right" size={20} color="#000000" />
           </TouchableOpacity>
         </View>
       </View>
@@ -274,13 +292,13 @@ const SettingsScreen: React.FC = () => {
             onPress={() => (navigation as any).navigate('Notifications')}
           >
             <View style={styles.listItemContent}>
-              <Text style={styles.listItemIcon}>🔔</Text>
+              <Icon name="bell" size={20} color="#000000" style={styles.listItemIcon} />
               <View style={styles.listItemText}>
                 <Text style={styles.listItemTitle}>Notifications</Text>
                 <Text style={styles.listItemDescription}>Configure app notifications</Text>
               </View>
             </View>
-            <Text style={styles.listItemChevron}>›</Text>
+            <Icon name="chevron-right" size={20} color="#000000" />
           </TouchableOpacity>
           
           <View style={styles.listDivider} />
@@ -290,13 +308,34 @@ const SettingsScreen: React.FC = () => {
             onPress={() => (navigation as any).navigate('DataStorage')}
           >
             <View style={styles.listItemContent}>
-              <Text style={styles.listItemIcon}>💾</Text>
+              <Icon name="content-save" size={20} color="#000000" style={styles.listItemIcon} />
               <View style={styles.listItemText}>
                 <Text style={styles.listItemTitle}>Data & Storage</Text>
                 <Text style={styles.listItemDescription}>Manage offline data and cache</Text>
               </View>
             </View>
-            <Text style={styles.listItemChevron}>›</Text>
+            <Icon name="chevron-right" size={20} color="#000000" />
+          </TouchableOpacity>
+          
+          <View style={styles.listDivider} />
+          
+          <TouchableOpacity 
+            style={styles.listItemContainer}
+            onPress={handleExportExcel}
+            disabled={exportLoading}
+          >
+            <View style={styles.listItemContent}>
+              <Icon name="file-excel" size={20} color="#000000" style={styles.listItemIcon} />
+              <View style={styles.listItemText}>
+                <Text style={styles.listItemTitle}>Export to Excel</Text>
+                <Text style={styles.listItemDescription}>Export invoice data for analysis</Text>
+              </View>
+            </View>
+            {exportLoading ? (
+              <ActivityIndicator size="small" color="#000000" />
+            ) : (
+              <Icon name="chevron-right" size={20} color="#000000" />
+            )}
           </TouchableOpacity>
           
           <View style={styles.listDivider} />
@@ -306,13 +345,13 @@ const SettingsScreen: React.FC = () => {
             onPress={() => (navigation as any).navigate('HelpSupport')}
           >
             <View style={styles.listItemContent}>
-              <Text style={styles.listItemIcon}>❓</Text>
+              <Icon name="help-circle" size={20} color="#000000" style={styles.listItemIcon} />
               <View style={styles.listItemText}>
                 <Text style={styles.listItemTitle}>Help & Support</Text>
                 <Text style={styles.listItemDescription}>Get help and contact support</Text>
               </View>
             </View>
-            <Text style={styles.listItemChevron}>›</Text>
+            <Icon name="chevron-right" size={20} color="#000000" />
           </TouchableOpacity>
         </View>
       </View>
@@ -353,7 +392,8 @@ const SettingsScreen: React.FC = () => {
           onPress={handleLogout}
           style={[styles.logoutButton, { backgroundColor: colors.background, borderColor: colors.primary }]}
         >
-          <Text style={{ color: colors.primary }}>🚪 Logout</Text>
+          <Icon name="logout" size={20} color={colors.primary} style={{ marginRight: spacing.sm }} />
+          <Text style={{ color: colors.primary }}>Logout</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
@@ -489,6 +529,9 @@ const styles = StyleSheet.create({
   logoutButton: {
     borderColor: colors.primary,
     paddingVertical: spacing.xs,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   listItemContainer: {
     flexDirection: 'row',
@@ -503,9 +546,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   listItemIcon: {
-    fontSize: 20,
     marginRight: spacing.md,
-    color: colors.primary,
   },
   listItemText: {
     flex: 1,
@@ -517,10 +558,6 @@ const styles = StyleSheet.create({
   },
   listItemDescription: {
     ...typography.caption,
-    color: colors.textSecondary,
-  },
-  listItemChevron: {
-    fontSize: 18,
     color: colors.textSecondary,
   },
   inputContainer: {

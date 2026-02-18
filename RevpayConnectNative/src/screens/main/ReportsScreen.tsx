@@ -9,7 +9,9 @@ import {
   Dimensions,
   TouchableOpacity,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import Share from 'react-native-share';
 import RNFS from 'react-native-fs';
 import * as XLSX from 'xlsx';
@@ -28,6 +30,7 @@ const ReportsScreen: React.FC = () => {
   const [selectedPeriod, setSelectedPeriod] = useState<'month' | 'quarter' | 'year'>('month');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [exportLoading, setExportLoading] = useState(false);
 
   const periods = [
     { key: 'month', label: 'Monthly' },
@@ -69,6 +72,7 @@ const ReportsScreen: React.FC = () => {
 
 
   const handleExportExcel = async () => {
+    setExportLoading(true);
     try {
       // Fetch all invoices
       const invoicesResponse = await apiService.getInvoices(1, 1000);
@@ -152,6 +156,8 @@ const ReportsScreen: React.FC = () => {
     } catch (error) {
       console.error('Excel Export Error:', error);
       Alert.alert('Error', 'Failed to export Excel: ' + (error as Error).message);
+    } finally {
+      setExportLoading(false);
     }
   };
 
@@ -189,12 +195,13 @@ const ReportsScreen: React.FC = () => {
     <View style={styles.statCard}>
       <View style={styles.statCardContent}>
         <View style={styles.statHeader}>
-          <Text style={{ fontSize: 24, color: colors.primary }}>📊</Text>
+          <Icon name={icon} size={24} color="#000000" />
           {trend && (
-            <Text 
-              style={{ fontSize: 16, color: trend === 'up' ? colors.primary : trend === 'down' ? colors.primary : colors.textSecondary }}>
-              {trend === 'up' ? '↗️' : trend === 'down' ? '↘️' : '➡️'}
-            </Text>
+            <Icon 
+              name={trend === 'up' ? 'trending-up' : trend === 'down' ? 'trending-down' : 'minus'} 
+              size={16} 
+              color={trend === 'up' ? colors.success : trend === 'down' ? colors.error : colors.textSecondary} 
+            />
           )}
         </View>
         <Text style={styles.statValue}>{value}</Text>
@@ -248,13 +255,13 @@ const ReportsScreen: React.FC = () => {
           <StatCard
             title="Total Invoices"
             value={currentMonth.totalInvoices}
-            icon="document-text-outline"
+            icon="file-document-multiple"
             trend="up"
           />
           <StatCard
             title="Success Rate"
             value={`${currentMonth.successRate}%`}
-            icon="checkmark-circle-outline"
+            icon="check-circle"
             trend="up"
           />
         </View>
@@ -263,14 +270,14 @@ const ReportsScreen: React.FC = () => {
             title="Revenue"
             value={`KSh ${currentMonth.totalRevenue.toLocaleString()}`}
             subtitle="This month"
-            icon="trending-up-outline"
+            icon="cash"
             trend="up"
           />
           <StatCard
             title="Failed"
             value={currentMonth.failedInvoices}
             subtitle="Needs attention"
-            icon="alert-circle-outline"
+            icon="alert-circle"
             trend="down"
           />
         </View>
@@ -328,7 +335,7 @@ const ReportsScreen: React.FC = () => {
               </Text>
             </View>
             <View style={styles.complianceStatus}>
-              <Text style={{ fontSize: 24, color: colors.primary }}>✅</Text>
+              <Icon name="check-circle" size={24} color={colors.success} />
               <Text style={styles.complianceStatusText}>Compliant</Text>
             </View>
           </View>
@@ -343,7 +350,7 @@ const ReportsScreen: React.FC = () => {
               </Text>
             </View>
             <View style={styles.complianceStatus}>
-              <Text style={{ fontSize: 24, color: colors.primary }}>✅</Text>
+              <Icon name="shield-check" size={24} color={colors.success} />
               <Text style={styles.complianceStatusText}>Active</Text>
             </View>
           </View>
@@ -358,7 +365,7 @@ const ReportsScreen: React.FC = () => {
               </Text>
             </View>
             <View style={styles.complianceStatus}>
-              <Text style={{ fontSize: 24, color: colors.primary }}>🔄</Text>
+              <Icon name="sync" size={24} color={colors.primary} />
               <Text style={styles.complianceStatusText}>Synced</Text>
             </View>
           </View>
@@ -376,9 +383,17 @@ const ReportsScreen: React.FC = () => {
           <View style={styles.exportButtons}>
             <TouchableOpacity
               onPress={handleExportExcel}
+              disabled={exportLoading}
               style={[styles.exportButton, { flex: 1, marginHorizontal: 0 }]}
             >
-              <Text style={styles.exportButtonText}>📊 Export Excel</Text>
+              {exportLoading ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <>
+                  <Icon name="file-excel" size={20} color={colors.primary} style={{ marginRight: spacing.sm }} />
+                  <Text style={styles.exportButtonText}>Export Excel</Text>
+                </>
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -541,7 +556,12 @@ const styles = StyleSheet.create({
     flex: 1,
     marginHorizontal: spacing.xs,
     borderColor: colors.primary,
-    paddingVertical: spacing.xs,
+    paddingVertical: spacing.md,
+    borderWidth: 1,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   chartPlaceholder: {
     textAlign: 'center',

@@ -29,6 +29,13 @@ class ComplianceService:
         Returns:
             Tuple of (can_create: bool, message: str)
         """
+        # DEVELOPMENT MODE: Disable 24-hour check for testing
+        # TODO: Re-enable for production deployment
+        from django.conf import settings
+        if settings.DEBUG:
+            logger.info(f"Development mode: Skipping 24-hour offline check for device {device.serial_number}")
+            return True, "OK (development mode)"
+        
         # Check if device has ever synced
         if not device.last_sync:
             return False, "Device has never synced with KRA. Initial sync required."

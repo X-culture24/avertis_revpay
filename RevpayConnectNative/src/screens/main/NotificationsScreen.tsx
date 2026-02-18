@@ -137,9 +137,21 @@ const NotificationsScreen: React.FC = () => {
 
   const saveNotificationSettings = async () => {
     try {
-      // TODO: Save settings to AsyncStorage and API
-      Alert.alert('Success', 'Notification settings saved successfully');
-    } catch (error) {
+      const response = await apiService.post('/notifications/settings/', {
+        push_enabled: pushEnabled,
+        email_enabled: emailEnabled,
+        invoice_notifications: invoiceNotifs,
+        sync_notifications: syncNotifs,
+        compliance_notifications: complianceNotifs,
+      });
+      
+      if (response.success) {
+        Alert.alert('Success', 'Notification settings saved successfully');
+      } else {
+        Alert.alert('Error', response.message || 'Failed to save settings');
+      }
+    } catch (error: any) {
+      console.error('Error saving notification settings:', error);
       Alert.alert('Error', 'Failed to save notification settings');
     }
   };

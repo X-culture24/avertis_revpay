@@ -111,8 +111,14 @@ def retry_sales_invoice(self, invoice_id: str):
                 invoice.receipt_no = result['receipt_no']
                 invoice.internal_data = result['internal_data']
                 invoice.receipt_signature = result['receipt_signature']
+                invoice.qr_code_data = result.get('qr_code', '')
                 invoice.status = 'confirmed'
                 invoice.save()
+                
+                # Generate QR code if not provided by KRA
+                if not invoice.qr_code_data:
+                    from .services.qr_service import QRCodeService
+                    QRCodeService.update_invoice_qr(invoice)
                 
                 retry_entry.status = 'completed'
                 retry_entry.save()

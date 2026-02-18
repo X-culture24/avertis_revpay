@@ -24,6 +24,7 @@ const ProfileScreen: React.FC = () => {
   
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
+    full_name: '',
     businessName: '',
     kraPin: '',
     email: '',
@@ -38,6 +39,7 @@ const ProfileScreen: React.FC = () => {
   const loadUserData = () => {
     if (auth.user) {
       setFormData({
+        full_name: auth.user.full_name || auth.user.first_name || '',
         businessName: auth.user.businessName || '',
         kraPin: auth.user.kraPin || '',
         email: auth.user.email || '',
@@ -48,7 +50,7 @@ const ProfileScreen: React.FC = () => {
   };
 
   const handleUpdateProfile = async () => {
-    if (!formData.businessName || !formData.kraPin || !formData.email || !formData.phone) {
+    if (!formData.full_name || !formData.businessName || !formData.kraPin || !formData.email || !formData.phone) {
       Alert.alert('Error', 'Please fill in all required fields');
       return;
     }
@@ -60,7 +62,13 @@ const ProfileScreen: React.FC = () => {
       if (response.success && response.data) {
         setAuth(prev => ({
           ...prev,
-          user: response.data as User,
+          user: {
+            ...prev.user,
+            ...response.data,
+            full_name: response.data.user?.full_name || formData.full_name,
+            first_name: response.data.user?.first_name,
+            last_name: response.data.user?.last_name,
+          } as User,
         }));
         Alert.alert('Success', 'Profile updated successfully');
       } else {
@@ -78,6 +86,7 @@ const ProfileScreen: React.FC = () => {
   }, [auth.user]);
 
   const getInitials = (name: string) => {
+    if (!name) return 'U';
     return name
       .split(' ')
       .map(word => word.charAt(0))
@@ -97,11 +106,13 @@ const ProfileScreen: React.FC = () => {
           <View style={styles.headerContent}>
             <View style={styles.avatar}>
               <Text style={styles.avatarLabel}>
-                {getInitials(formData.businessName || 'Business')}
+                {getInitials(formData.full_name || formData.businessName || 'User')}
               </Text>
             </View>
             <View style={styles.headerInfo}>
-              <Text style={styles.businessName}>{formData.businessName || 'Business Name'}</Text>
+              <Text style={styles.businessName}>
+                {formData.full_name || formData.businessName || 'User'}
+              </Text>
               <Text style={styles.subscriptionType}>
                 {auth.user?.subscriptionType || 'Free'} Plan
               </Text>
@@ -115,6 +126,51 @@ const ProfileScreen: React.FC = () => {
         </View>
 
         {/* Profile Form */}
+        <View style={styles.card}>
+          <View style={styles.cardContent}>
+            <Text style={styles.sectionTitle}>Personal Information</Text>
+            
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Full Name *</Text>
+              <TextInput
+                value={formData.full_name}
+                onChangeText={(value) => updateFormData('full_name', value)}
+                style={styles.textInput}
+                placeholder="Enter your full name"
+                placeholderTextColor={colors.textSecondary}
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Email Address *</Text>
+              <TextInput
+                value={formData.email}
+                onChangeText={(value) => updateFormData('email', value)}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                style={styles.textInput}
+                placeholder="Enter email address"
+                placeholderTextColor={colors.textSecondary}
+                editable={false}
+              />
+              <Text style={styles.helperText}>Email cannot be changed</Text>
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Phone Number *</Text>
+              <TextInput
+                value={formData.phone}
+                onChangeText={(value) => updateFormData('phone', value)}
+                keyboardType="phone-pad"
+                style={styles.textInput}
+                placeholder="Enter phone number"
+                placeholderTextColor={colors.textSecondary}
+              />
+            </View>
+          </View>
+        </View>
+
+        {/* Business Information */}
         <View style={styles.card}>
           <View style={styles.cardContent}>
             <Text style={styles.sectionTitle}>Business Information</Text>
@@ -143,39 +199,14 @@ const ProfileScreen: React.FC = () => {
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Email Address *</Text>
-              <TextInput
-                value={formData.email}
-                onChangeText={(value) => updateFormData('email', value)}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                style={styles.textInput}
-                placeholder="Enter email address"
-                placeholderTextColor={colors.textSecondary}
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Phone Number *</Text>
-              <TextInput
-                value={formData.phone}
-                onChangeText={(value) => updateFormData('phone', value)}
-                keyboardType="phone-pad"
-                style={styles.textInput}
-                placeholder="Enter phone number"
-                placeholderTextColor={colors.textSecondary}
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>POS Details (Optional)</Text>
+              <Text style={styles.inputLabel}>Business Address (Optional)</Text>
               <TextInput
                 value={formData.posDetails}
                 onChangeText={(value) => updateFormData('posDetails', value)}
                 multiline
                 numberOfLines={3}
                 style={[styles.textInput, styles.multilineInput]}
-                placeholder="Enter details about your POS system"
+                placeholder="Enter business address"
                 placeholderTextColor={colors.textSecondary}
               />
             </View>
@@ -400,6 +431,12 @@ const styles = StyleSheet.create({
     color: colors.secondary,
     fontWeight: 'bold',
     fontSize: 16,
+  },
+  helperText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
+    fontStyle: 'italic',
   },
 });
 

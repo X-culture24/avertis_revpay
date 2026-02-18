@@ -53,16 +53,28 @@ def mobile_login(request):
             user_data = {
                 'id': user.id,
                 'email': user.email,
-                'businessName': company.business_name,
+                'username': user.username,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'full_name': f"{user.first_name} {user.last_name}".strip() or company.contact_person,
+                'name': company.contact_person,
+                'businessName': company.company_name,
+                'company_name': company.company_name,
                 'company': {
                     'tin': company.tin,
-                    'business_name': company.business_name,
+                    'company_name': company.company_name,
+                    'contact_person': company.contact_person,
                 }
             }
         except Company.DoesNotExist:
             user_data = {
                 'id': user.id,
                 'email': user.email,
+                'username': user.username,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'full_name': f"{user.first_name} {user.last_name}".strip(),
+                'name': user.username,
                 'businessName': user.email,
             }
         
@@ -249,25 +261,78 @@ def mobile_invoice_details(request, invoice_id):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def mobile_resync_invoice(request, invoice_id):
-    """Resync invoice for mobile app"""
+    """Resync invoice for mobile app - immediate retry"""
     try:
+        from .services.kra_client import KRAClient
+        from django.utils import timezone
+        from django.conf import settings
+        
         company = Company.objects.get(contact_email=request.user.email)
         invoice = Invoice.objects.get(id=invoice_id, company=company)
         
-        # Submit to retry queue
-        from .tasks import submit_invoice_to_kra
-        submit_invoice_to_kra.delay(str(invoice.id))
+        # Only resync if invoice is in retry or failed status
+        if invoice.status not in ['retry', 'failed', 'pending']:
+            return Response({
+                'success': True,
+                'message': f'Invoice is already {invoice.status}',
+                'status': invoice.status
+            })
         
-        return Response({
-            'message': 'Invoice queued for resync'
-        })
+        # Ensure TIN is registered with mock service (fallback for old registrations)
+        if getattr(settings, 'KRA_USE_MOCK', True):
+            from .services.kra_mock_service import KRAMockService
+            if not KRAMockService.is_tin_registered(company.tin):
+                KRAMockService.register_tin(company.tin)
+                logger.info(f"Auto-registered TIN {company.tin} with mock service during resync")
+        
+        # Try immediate submission
+        logger.info(f"Manual resync for invoice {invoice.invoice_no}")
+        kra_client = KRAClient()
+        result = kra_client.send_sales_invoice(invoice)
+        
+        if result.get('success'):
+            # Update invoice with KRA response
+            invoice.receipt_no = result.get('receipt_no')
+            invoice.internal_data = result.get('internal_data')
+            invoice.receipt_signature = result.get('receipt_signature')
+            invoice.qr_code_data = result.get('qr_code', '')
+            invoice.status = 'confirmed'
+            invoice.synced_at = timezone.now()
+            invoice.save()
+            
+            # Generate QR code if not provided by KRA
+            if not invoice.qr_code_data:
+                from .services.qr_service import QRCodeService
+                QRCodeService.update_invoice_qr(invoice)
+            
+            logger.info(f"Invoice {invoice.invoice_no} successfully resynced")
+            
+            return Response({
+                'success': True,
+                'message': 'Invoice successfully synced with KRA',
+                'status': 'confirmed',
+                'receipt_no': invoice.receipt_no
+            })
+        else:
+            # Update error message but keep in retry status
+            invoice.error_message = result.get('error_message', 'KRA submission failed')
+            invoice.save()
+            
+            return Response({
+                'success': False,
+                'message': result.get('error_message', 'KRA submission failed'),
+                'status': invoice.status
+            }, status=status.HTTP_400_BAD_REQUEST)
         
     except (Company.DoesNotExist, Invoice.DoesNotExist):
         return Response({
+            'success': False,
             'error': 'Invoice not found'
         }, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
+        logger.error(f"Error resyncing invoice: {str(e)}")
         return Response({
+            'success': False,
             'error': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -337,3 +402,71 @@ def digitax_callback(request):
     except Exception as e:
         logger.error(f"DigiTax callback error: {e}")
         return Response({'status': 'error', 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def export_invoices_excel(request):
+    """
+    Export invoices to Excel format
+    
+    POST /api/mobile/invoices/export-excel/
+    Body: {
+        "date_range": {
+            "start": "2024-01-01",
+            "end": "2024-12-31"
+        }
+    }
+    """
+    try:
+        from django.http import HttpResponse
+        from .services.excel_export_service import ExcelExportService
+        
+        # Get user's company
+        company = Company.objects.filter(contact_email=request.user.email).first()
+        if not company:
+            return Response({
+                'success': False,
+                'message': 'Company not found for user'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        # Get invoices for the company
+        invoices = Invoice.objects.filter(company=company).order_by('-created_at')
+        
+        # Parse date range if provided
+        date_range = None
+        if 'date_range' in request.data and request.data['date_range']:
+            try:
+                from datetime import datetime
+                date_range = {
+                    'start': datetime.strptime(request.data['date_range']['start'], '%Y-%m-%d'),
+                    'end': datetime.strptime(request.data['date_range']['end'], '%Y-%m-%d')
+                }
+                logger.info(f"Exporting invoices with date range: {date_range}")
+            except (ValueError, KeyError) as e:
+                return Response({
+                    'success': False,
+                    'message': f'Invalid date range format: {str(e)}'
+                }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Generate Excel file
+        export_service = ExcelExportService()
+        excel_file = export_service.export_invoices(invoices, date_range)
+        
+        # Create response
+        response = HttpResponse(
+            excel_file.read(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        filename = f"invoices_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        logger.info(f"Excel export successful for company {company.business_name}: {filename}")
+        return response
+        
+    except Exception as e:
+        logger.error(f"Excel export error: {e}")
+        return Response({
+            'success': False,
+            'message': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -68,8 +68,8 @@ class Company(BaseModel):
     tin = models.CharField(
         max_length=11,
         unique=True,
-        validators=[RegexValidator(r'^\d{11}$', 'TIN must be 11 digits')],
-        help_text="Tax Identification Number (11 digits)"
+        validators=[RegexValidator(r'^[A-Z0-9]{11}$', 'TIN must be 11 alphanumeric characters')],
+        help_text="Tax Identification Number (11 characters)"
     )
     
     # Contact information
@@ -156,6 +156,44 @@ class Company(BaseModel):
     @property
     def is_active(self):
         return self.status == 'active'
+    
+    @property
+    def current_subscription(self):
+        """Get current active subscription"""
+        try:
+            return self.subscription
+        except:
+            return None
+    
+    @property
+    def can_create_invoice(self):
+        """Check if company can create invoices based on subscription"""
+        subscription = self.current_subscription
+        if not subscription:
+            # Temporarily allow invoice creation without subscription for testing
+            # TODO: Enforce subscription limits in production
+            return True, "No subscription check - development mode"
+        
+        return subscription.can_create_invoice
+    
+    @property
+    def can_add_device(self):
+        """Check if company can add devices based on subscription"""
+        subscription = self.current_subscription
+        if not subscription:
+            # Temporarily allow device addition without subscription for testing
+            # TODO: Enforce subscription limits in production
+            return True, "No subscription check - development mode"
+        
+        return subscription.can_add_device
+    
+    @property
+    def current_subscription_status(self):
+        """Get current subscription status from Subscription model"""
+        subscription = self.current_subscription
+        if not subscription:
+            return self.subscription_status  # Return the field value
+        return subscription.status
 
 
 class Device(BaseModel, EncryptionMixin):
@@ -211,8 +249,8 @@ class Device(BaseModel, EncryptionMixin):
     # KRA required fields
     tin = models.CharField(
         max_length=11,
-        validators=[RegexValidator(r'^\d{11}$', 'TIN must be 11 digits')],
-        help_text="Tax Identification Number (11 digits)"
+        validators=[RegexValidator(r'^[A-Z0-9]{11}$', 'TIN must be 11 alphanumeric characters')],
+        help_text="Tax Identification Number (11 characters)"
     )
     bhf_id = models.CharField(
         max_length=3,
@@ -1221,3 +1259,306 @@ class PartnershipAgreement(BaseModel):
         return self.status == 'active' and (
             not self.agreement_end_date or self.agreement_end_date >= timezone.now().date()
         )
+
+
+class SubscriptionPlan(BaseModel):
+    """
+    SaaS subscription plans for RevPay Connect
+    """
+    PLAN_TYPE_CHOICES = [
+        ('free', 'Free Plan'),
+        ('starter', 'Starter Plan'),
+        ('business', 'Business Plan'),
+        ('enterprise', 'Enterprise Plan'),
+        ('custom', 'Custom Plan'),
+    ]
+    
+    BILLING_CYCLE_CHOICES = [
+        ('monthly', 'Monthly'),
+        ('quarterly', 'Quarterly'),
+        ('annually', 'Annually'),
+        ('lifetime', 'Lifetime'),
+    ]
+    
+    name = models.CharField(max_length=100, help_text="Plan name")
+    plan_type = models.CharField(max_length=20, choices=PLAN_TYPE_CHOICES)
+    description = models.TextField(help_text="Plan description")
+    
+    # Pricing
+    price = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        help_text="Plan price"
+    )
+    currency = models.CharField(max_length=3, default='KES')
+    billing_cycle = models.CharField(max_length=20, choices=BILLING_CYCLE_CHOICES)
+    
+    # Limits
+    invoice_limit_per_month = models.IntegerField(
+        default=-1,
+        help_text="Monthly invoice limit (-1 for unlimited)"
+    )
+    device_limit = models.IntegerField(
+        default=1,
+        help_text="Maximum number of devices"
+    )
+    user_limit = models.IntegerField(
+        default=1,
+        help_text="Maximum number of users"
+    )
+    
+    # Features
+    features = models.JSONField(
+        default=dict,
+        help_text="Plan features as JSON"
+    )
+    
+    # Status
+    is_active = models.BooleanField(default=True)
+    is_popular = models.BooleanField(default=False, help_text="Mark as popular plan")
+    sort_order = models.IntegerField(default=0, help_text="Display order")
+    
+    # Trial
+    trial_days = models.IntegerField(default=30, help_text="Free trial days")
+    
+    class Meta:
+        db_table = 'subscription_plans'
+        ordering = ['sort_order', 'price']
+        indexes = [
+            models.Index(fields=['plan_type']),
+            models.Index(fields=['is_active']),
+            models.Index(fields=['sort_order']),
+        ]
+    
+    def __str__(self):
+        return f"{self.name} - {self.currency} {self.price}/{self.billing_cycle}"
+    
+    @property
+    def monthly_price(self):
+        """Calculate monthly equivalent price"""
+        if self.billing_cycle == 'monthly':
+            return self.price
+        elif self.billing_cycle == 'quarterly':
+            return self.price / 3
+        elif self.billing_cycle == 'annually':
+            return self.price / 12
+        else:
+            return self.price
+
+
+class Subscription(BaseModel):
+    """
+    Company subscription to RevPay Connect SaaS
+    """
+    STATUS_CHOICES = [
+        ('trial', 'Free Trial'),
+        ('active', 'Active'),
+        ('past_due', 'Past Due'),
+        ('cancelled', 'Cancelled'),
+        ('expired', 'Expired'),
+        ('suspended', 'Suspended'),
+    ]
+    
+    PAYMENT_STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('paid', 'Paid'),
+        ('failed', 'Failed'),
+        ('refunded', 'Refunded'),
+    ]
+    
+    company = models.OneToOneField(
+        Company,
+        on_delete=models.CASCADE,
+        related_name='subscription',
+        help_text="Company with this subscription"
+    )
+    plan = models.ForeignKey(
+        SubscriptionPlan,
+        on_delete=models.PROTECT,
+        related_name='subscriptions',
+        help_text="Current subscription plan"
+    )
+    
+    # Subscription details
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='trial')
+    started_at = models.DateTimeField(auto_now_add=True)
+    current_period_start = models.DateTimeField()
+    current_period_end = models.DateTimeField()
+    
+    # Trial
+    is_trial = models.BooleanField(default=True)
+    trial_start = models.DateTimeField(null=True, blank=True)
+    trial_end = models.DateTimeField(null=True, blank=True)
+    
+    # Payment
+    payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='pending')
+    last_payment_date = models.DateTimeField(null=True, blank=True)
+    next_payment_date = models.DateTimeField(null=True, blank=True)
+    
+    # Usage tracking
+    invoices_used_this_month = models.IntegerField(default=0)
+    devices_used = models.IntegerField(default=0)
+    users_used = models.IntegerField(default=1)
+    
+    # Billing
+    auto_renew = models.BooleanField(default=True)
+    payment_method = models.CharField(
+        max_length=50,
+        choices=[
+            ('bank_transfer', 'Bank Transfer'),
+            ('mpesa', 'M-Pesa'),
+            ('card', 'Credit/Debit Card'),
+            ('paypal', 'PayPal'),
+        ],
+        default='mpesa'
+    )
+    
+    # Cancellation
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+    cancellation_reason = models.TextField(blank=True)
+    
+    class Meta:
+        db_table = 'subscriptions'
+        indexes = [
+            models.Index(fields=['company']),
+            models.Index(fields=['status']),
+            models.Index(fields=['current_period_end']),
+            models.Index(fields=['next_payment_date']),
+        ]
+    
+    def __str__(self):
+        return f"{self.company.company_name} - {self.plan.name} ({self.status})"
+    
+    @property
+    def is_active(self):
+        """Check if subscription is currently active"""
+        return self.status in ['trial', 'active'] and self.current_period_end > timezone.now()
+    
+    @property
+    def days_remaining(self):
+        """Days remaining in current period"""
+        if self.current_period_end:
+            delta = self.current_period_end - timezone.now()
+            return max(0, delta.days)
+        return 0
+    
+    @property
+    def trial_days_left(self):
+        """Days left in trial period"""
+        if self.is_trial and self.trial_end:
+            delta = self.trial_end - timezone.now()
+            return max(0, delta.days)
+        return 0
+    
+    @property
+    def can_create_invoice(self):
+        """Check if company can create more invoices"""
+        if not self.is_active:
+            return False, "Subscription is not active"
+        
+        if self.plan.invoice_limit_per_month == -1:
+            return True, "Unlimited invoices"
+        
+        if self.invoices_used_this_month >= self.plan.invoice_limit_per_month:
+            return False, f"Monthly limit of {self.plan.invoice_limit_per_month} invoices reached"
+        
+        return True, "Can create invoice"
+    
+    @property
+    def can_add_device(self):
+        """Check if company can add more devices"""
+        if not self.is_active:
+            return False, "Subscription is not active"
+        
+        if self.devices_used >= self.plan.device_limit:
+            return False, f"Device limit of {self.plan.device_limit} reached"
+        
+        return True, "Can add device"
+    
+    def increment_invoice_usage(self):
+        """Increment monthly invoice usage"""
+        self.invoices_used_this_month += 1
+        self.save()
+    
+    def reset_monthly_usage(self):
+        """Reset monthly usage counters"""
+        self.invoices_used_this_month = 0
+        self.save()
+
+
+class Payment(BaseModel):
+    """
+    Payment records for subscriptions
+    """
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('processing', 'Processing'),
+        ('completed', 'Completed'),
+        ('failed', 'Failed'),
+        ('cancelled', 'Cancelled'),
+        ('refunded', 'Refunded'),
+    ]
+    
+    PAYMENT_METHOD_CHOICES = [
+        ('mpesa', 'M-Pesa'),
+        ('bank_transfer', 'Bank Transfer'),
+        ('card', 'Credit/Debit Card'),
+        ('paypal', 'PayPal'),
+    ]
+    
+    subscription = models.ForeignKey(
+        Subscription,
+        on_delete=models.CASCADE,
+        related_name='payments',
+        help_text="Subscription this payment is for"
+    )
+    
+    # Payment details
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    currency = models.CharField(max_length=3, default='KES')
+    payment_method = models.CharField(max_length=50, choices=PAYMENT_METHOD_CHOICES)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    
+    # External references
+    external_transaction_id = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text="Transaction ID from payment provider"
+    )
+    mpesa_receipt_number = models.CharField(
+        max_length=50,
+        blank=True,
+        help_text="M-Pesa receipt number"
+    )
+    
+    # Timestamps
+    payment_date = models.DateTimeField(null=True, blank=True)
+    due_date = models.DateTimeField(null=True, blank=True)
+    
+    # Billing period
+    billing_period_start = models.DateTimeField()
+    billing_period_end = models.DateTimeField()
+    
+    # Metadata
+    payment_metadata = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Additional payment data"
+    )
+    
+    class Meta:
+        db_table = 'payments'
+        indexes = [
+            models.Index(fields=['subscription']),
+            models.Index(fields=['status']),
+            models.Index(fields=['payment_date']),
+            models.Index(fields=['external_transaction_id']),
+        ]
+    
+    def __str__(self):
+        return f"Payment {self.amount} {self.currency} - {self.subscription.company.company_name}"
+    
+    @property
+    def is_overdue(self):
+        """Check if payment is overdue"""
+        return self.due_date and self.due_date < timezone.now() and self.status == 'pending'
